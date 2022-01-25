@@ -21,30 +21,16 @@ from io import BytesIO
 
 
 controls = dbc.Card(
-        [
-            html.Div(
-                [
-                dbc.Label("Image configuration"),
-                    dcc.Checklist(
-                        id='img_config',
-                        options=[
-                            {'label': 'Grayscale', 'value': 0},
-                            {'label': 'RGB', 'value': 1},
-                             ],
-                        value=[0],
-                        labelStyle={'display': 'inline-block'}
-                    )
-            ]),
-            html.Div(
+        [html.Div(
                 [
                     dbc.Label("Choose seed channel"),
-                    dcc.Checklist(
+                    dcc.RadioItems(
                         id='act_ch',
                         options=[
                             {'label': 'Channel 1', 'value': 1},
                             {'label': 'Channel 2', 'value': 2},
                         ],
-                        value=[1],
+                        value=1,
                         labelStyle={'display': 'inline-block'}
                     )
                 ]),
@@ -73,42 +59,60 @@ controls = dbc.Card(
                         marks={i: i for i in [20, 30, 40, 50 ,60 ,70 ,80]},
                         value=1,
                         ),
-                ]
-            )
+            ])
         ], body=True)
 
 
 
 controls_nuc = dbc.Card(
         [
-         html.Div(
-                [
-                    dbc.Label("Nucleus segmentation"),
-                    dbc.Label("Local Threshold:"),
-                    dcc.Slider(
-                        id='block_size',
-                        min=1,
-                        max=51,
-                        step=2,
-                        marks={i: i for i in [20, 30, 40, 50 ,60 ,70 ,80]},
-                        value=13,
-                        #tooltip = { 'always_visible': True }
-                        ),
-                ]
-            ),
             html.Div(
                 [
                     dbc.Label("Auto parameters initialise"),
-                    dcc.Checklist(
-                        id='Auto-nuc',
-                        options=[
-                            {'label': 'on', 'value': 1},
-                            {'label': 'off', 'value': 0},
-                        ],
-                        value=[0],
-                        labelStyle={'display': 'inline-block'}
-                    )
-            ]),
+                    dbc.Row([
+                        dbc.Col(
+                            daq.BooleanSwitch(
+                                id='Auto-nuc',
+                                disabled=False,
+                                on=False,
+                            )),
+                            dbc.Col([
+                                daq.GraduatedBar(
+                                        id='graduated-bar',
+                                        label="Search more",
+                                        value=1,
+                                        min=1,
+                                        max=10
+                                    ),
+                                dcc.Slider(
+                                    id='graduated-bar-slider',
+                                    min=1,
+                                    max=10,
+                                    step=1,
+                                    value=1
+                                ),
+                            ]),
+
+                            dbc.Col([
+                                daq.GraduatedBar(
+                                    id='graduated-bar-nuc-zoom',
+                                    label="Zoom in filter",
+                                    value=5,
+                                    min=1,
+                                    max=100
+                                ),
+                                dcc.Slider(
+                                    id='graduated-bar-slider-nuc-zoom',
+                                    min=1,
+                                    max=100,
+                                    step=1,
+                                    value=5
+                                ),
+                            ]),
+                            dbc.Col(
+                                html.Button('Set', id='set-val', n_clicks=0))
+                        ]),
+                    ]),
             html.Div(
                 [
                     dbc.Label("Detect nuclei edges:"),
@@ -124,6 +128,22 @@ controls_nuc = dbc.Card(
             ),
             html.Div(
                 [
+                    dbc.Label("Nucleus segmentation"),
+                    html.Br(),
+                    dbc.Label("Local Threshold:"),
+                    dcc.Slider(
+                        id='block_size',
+                        min=1,
+                        max=101,
+                        step=2,
+                        marks={i: i for i in [20, 30, 40, 50 ,60 ,70 ,80]},
+                        value=59,
+                        #tooltip = { 'always_visible': True }
+                        ),
+                ]
+            ),
+            html.Div(
+                [
                     dbc.Label("Remove small objects:"),
                     dcc.Slider(
                         id='rmv_object_nuc',
@@ -131,7 +151,7 @@ controls_nuc = dbc.Card(
                         max=0.99,
                         step=0.01,
                         marks={i: i for i in [0.01, 0.99]},
-                        value=0.3
+                        value=0.9
                     ),
                 ]
             ),
@@ -144,44 +164,50 @@ controls_cyto = dbc.Card(
         [
             html.Div(
                 [
-                    dbc.Label("Cytosol segmentation"),
-                    dcc.Checklist(
-                        id='cyto_seg',
-                        options=[
-                            {'label': 'on', 'value': 1},
-                            {'label': 'off', 'value': 0}
-                        ],
-                        value=[1],
-                        labelStyle={'display': 'inline-block'}
-                    )
-                ]),
-            html.Div(
-                [
                     dbc.Label("Auto parameters initialise"),
-                    dcc.Checklist(
-                        id='Auto-cyto',
-                        options=[
-                            {'label': 'on', 'value': 1},
-                            {'label': 'off', 'value': 0},
-                        ],
-                        value=[1],
-                        labelStyle={'display': 'inline-block'}
-                    )
-                ]),
-            html.Div(
-                [
-                    dbc.Label("Local Threshold:"),
-                    dcc.Slider(
-                        id='block_size_cyto',
-                        min=1,
-                        max=51,
-                        step=2,
-                        marks={i: i for i in [20, 30, 40, 50, 60, 70, 80]},
-                        value=13,
-                        #tooltip = { 'always_visible': True }
-                        ),
-                ]
-            ),
+                    dbc.Row([
+                        dbc.Col(
+                            daq.BooleanSwitch(
+                                id='Auto-cyto',
+                                disabled=False,
+                                on=False,
+                            )),
+                            dbc.Col([
+                                daq.GraduatedBar(
+                                        id='graduated-bar-cyto',
+                                        label="Search more",
+                                        value=1,
+                                        min=1,
+                                        max=20
+                                    ),
+                                dcc.Slider(
+                                    id='graduated-bar-slider-cyto',
+                                    min=1,
+                                    max=20,
+                                    step=1,
+                                    value=1
+                                ),
+                            ]),
+                            dbc.Col([
+                                daq.GraduatedBar(
+                                    id='graduated-bar-cyto-zoom',
+                                    label="Zoom in filter",
+                                    value=5,
+                                    min=1,
+                                    max=100
+                                ),
+                                dcc.Slider(
+                                    id='graduated-bar-slider-cyto-zoom',
+                                    min=1,
+                                    max=100,
+                                    step=1,
+                                    value=5
+                                ),
+                            ]),
+                            dbc.Col(
+                                html.Button('Set', id='set-val-cyto', n_clicks=0))
+                        ]),
+                    ]),
             html.Div(
                 [
                     dbc.Label("Detect cytosol edges:"),
@@ -194,6 +220,20 @@ controls_cyto = dbc.Card(
                         value=0.001,
                         #tooltip = { 'always_visible': True }
                     ),
+                ]
+            ),
+            html.Div(
+                [
+                    dbc.Label("Local Threshold:"),
+                    dcc.Slider(
+                        id='block_size_cyto',
+                        min=1,
+                        max=51,
+                        step=2,
+                        marks={i: i for i in [20, 30, 40, 50, 60, 70, 80]},
+                        value=13,
+                        #tooltip = { 'always_visible': True }
+                        ),
                 ]
             ),
             html.Div(
@@ -235,7 +275,6 @@ controls_cyto = dbc.Card(
                     ),
                 ]
             ),
-
          ],
         body=True,
     )

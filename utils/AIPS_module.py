@@ -1,14 +1,14 @@
 import tifffile as tfi
 import numpy as np
-from skimage.filters import threshold_otsu, threshold_local
-from scipy.ndimage.morphology import binary_opening, binary_erosion
+from skimage.filters import threshold_local
+from scipy.ndimage.morphology import binary_opening
 import skimage.morphology as sm
 from skimage.segmentation import watershed
 from skimage import measure
 import os
 import pandas as pd
 from scipy.ndimage.morphology import binary_fill_holes
-from utils.display_and_xml import evaluate_image_output
+from apps.utils.display_and_xml import evaluate_image_output,test_image
 
 class AIPS:
     def __init__(self, Image_name, path, rmv_object_nuc, block_size, offset):
@@ -29,15 +29,14 @@ class AIPS:
         pixels = tfi.imread(os.path.join(self.path,self.Image_name))
         pixels_float = pixels.astype('float64')
         pixels_float = pixels_float / 65535.000
+        if len(np.shape(pixels_float)) < 3:
+            pixels_float = pixels_float.reshape(1, np.shape(pixels_float)[0], np.shape(pixels_float)[1])
+            pixels_float = np.concatenate((pixels_float,pixels_float),0)
         if np.shape(pixels_float)[2]==2:
             pixels_float = pixels_float.reshape(np.shape(pixels_float)[2],np.shape(pixels_float)[0],np.shape(pixels_float)[1])
-        if np.shape(pixels_float)[0] > 4:
-            # single chanlle image
-            grayscale_image_container = {'ch':pixels_float}
-        else:
-            for i in range(np.shape(pixels_float)[0]):
-                dict = {'{}'.format(i):pixels_float[i, :, :]}
-                grayscale_image_container.update(dict)
+        for i in range(np.shape(pixels_float)[0]):
+            dict = {'{}'.format(i):pixels_float[i, :, :]}
+            grayscale_image_container.update(dict)
         return grayscale_image_container
 
     def get_name_dict(dict):
@@ -51,10 +50,11 @@ class AIPS:
             l.append(name)
         return l
 
-    def Nucleus_segmentation(self,ch,inv=False):
+    def Nucleus_segmentation(self,ch, inv=False, for_dash=False):
         '''
         ch: Input image (tifffile image object)
-        ivt: if invert than no need to fill hall and open
+        inv: if invert than no need to fill hall and open
+        for_dash: return result which are competable for dash
         block_size: Detect local edges 1-99 odd
         offset: Detect local edges 0.001-0.9 odd
         rmv_object_nuc: percentile of cells to remove, 0.01-0.99
@@ -80,6 +80,7 @@ class AIPS:
                 intensity_image=ch,
                 properties=['area', 'label','coords','centroid'],
             )).set_index('label')
+        table_init = info_table
         #info_table.hist(column='area', bins=100)
         # remove small objects - test data frame of small objects
         test = info_table[info_table['area'] < info_table['area'].quantile(q=self.rmv_object_nuc)]
@@ -88,11 +89,18 @@ class AIPS:
             x = np.concatenate(np.array(test['coords']))
             sort_mask[tuple(x.T)[0], tuple(x.T)[1]] = 0
         else:
-            test = info_table[info_table['area'] < info_table['area'].quantile(q=0.5)]
-            x = np.concatenate(np.array(test['coords']))
-            sort_mask[tuple(x.T)[0], tuple(x.T)[1]] = 0
+            sort_mask = blank
         sort_mask_bin = np.where(sort_mask > 0, 1, 0)
-        dict = {'nmask2':nmask2,'nmask4':nmask4,'sort_mask':sort_mask,'sort_mask_bin':sort_mask_bin, 'table':test}
+        # test returns
+        if len(test_image(nmask2)) < 2:
+            nmask2 = blank.astype(int)
+        if len(test_image(nmask4)) < 2:
+            nmask2 = blank.astype(int)
+        if len(test_image(sort_mask)) < 2:
+            sort_mask = blank.astype(int)
+        if len(test_image(sort_mask_bin)) < 2:
+            sort_mask_bin = blank.astype(int)
+        dict = {'nmask2':nmask2, 'nmask4':nmask4, 'sort_mask':sort_mask, 'sort_mask_bin':sort_mask_bin, 'tabale_init': table_init, 'table':test}
         return dict
 
 class Segment_over_seed(AIPS):
@@ -129,11 +137,14 @@ class Segment_over_seed(AIPS):
         cell_mask_2: local threshold binary map (eg cytoplasm)
         combine: global threshold binary map (eg cytoplasm)
         sort_mask_syn: RGB segmented image output first channel for mask (eg nucleus) sync
+        mask_unfiltered: Mask before filtering object size
         cseg_mask: RGB segmented image output first channel for mask (eg nucleus)
         test: Area table seed
         info_table: Area table cytosol synchronize
+        table_unfiltered: Table before remove large and small objects
         '''
         ther_cell = threshold_local(ch2, self.block_size_cyto, "gaussian", self.offset_cyto)
+        blank = np.zeros(np.shape(ch))
         cell_mask_1 = ch2 > ther_cell
         cell_mask_2 = binary_opening(cell_mask_1, structure=np.ones((3, 3))).astype(np.float64)
         quntile_num = np.quantile(ch2, self.global_ther)
@@ -152,24 +163,21 @@ class Segment_over_seed(AIPS):
         # info_table.hist(column='area', bins=100)
         ############# remove large object ################
         cseg_mask = csegg
+        table_unfiltered = info_table
         test1 = info_table[info_table['area'] > info_table['area'].quantile(q = self.rmv_object_cyto)]
         if len(test1) > 0:
             x = np.concatenate(np.array(test1['coords']))
             cseg_mask[tuple(x.T)[0], tuple(x.T)[1]] = 0
 
         else:
-            test1 = info_table[info_table['area'] > info_table['area'].quantile(q=0.5)]
-            x = np.concatenate(np.array(test1['coords']))
-            cseg_mask[tuple(x.T)[0], tuple(x.T)[1]] = 0
+            cseg_mask = cseg_mask
         ############# remove small object ################
         test2 = info_table[info_table['area'] < info_table['area'].quantile(q = self.rmv_object_cyto_small)]
         if len(test2) > 0:
             x = np.concatenate(np.array(test2['coords']))
             cseg_mask[tuple(x.T)[0], tuple(x.T)[1]] = 0
         else:
-            test2 = info_table[info_table['area'] > info_table['area'].quantile(q=0.5)]
-            x = np.concatenate(np.array(test2['coords']))
-            cseg_mask[tuple(x.T)[0], tuple(x.T)[1]] = 0
+            cseg_mask = cseg_mask
         # sync seed mask with cytosol mask
         if self.remove_border:
             y_axis = np.shape(ch2)[0]
@@ -190,12 +198,17 @@ class Segment_over_seed(AIPS):
                     properties=['area', 'label', 'centroid'],
                 )).set_index('label')
         else :
-            info_table = pd.DataFrame(
-                measure.regionprops_table(
-                    cseg_mask,
-                    intensity_image=ch2,
-                    properties=['area', 'label', 'centroid'],
-                )).set_index('label')
+            if len(info_table) > 1:
+                info_table = pd.DataFrame(
+                    measure.regionprops_table(
+                        cseg_mask,
+                        intensity_image=ch2,
+                        properties=['area', 'label', 'centroid'],
+                    )).set_index('label')
+            else:
+                dict_blank = {'area':[0,0], 'label':[0,0], 'centroid':[0,0]}
+                info_table = pd.DataFrame(dict_blank)
+                cseg_mask = blank
         info_table['label'] = range(2, len(info_table) + 2)
         # round
         info_table = info_table.round({'centroid-0': 0, 'centroid-1': 0})
@@ -208,11 +221,16 @@ class Segment_over_seed(AIPS):
         #combine = evaluate_image_output(combine)
         combine_namsk = evaluate_image_output(combine_namsk)
         cseg_mask = evaluate_image_output(cseg_mask)
+        len_unfiltered = len(table_unfiltered)
+        len_test1 = len(table_unfiltered.drop(test1.index))
+        len_test2 = len(table_unfiltered.drop(test2.index))
+        dict_object_table = {'Start':len_unfiltered,"remove large objects":len_test1,"remove small objects":len_test2}
+        table_object_summary = pd.DataFrame(dict_object_table,index=[0])
         # check data frame
         if len(info_table)==0:
             d = {'area': [0], 'centroid-0': [0], 'centroid-1': [0], 'label': [0]}
             info_table = pd.DataFrame(d)
         else:
             info_table=info_table
-        dict = {'cell_mask_1': cell_mask_2,'combine': cell_mask_3,'sort_mask_sync':combine_namsk, 'cseg_mask': cseg_mask,'info_table': info_table}
+        dict = {'cell_mask_1': cell_mask_2,'combine': cell_mask_3,'sort_mask_sync':combine_namsk,'mask_unfiltered':cseg,'cseg_mask': cseg_mask,'info_table': info_table,'table_unfiltered':table_object_summary}
         return dict

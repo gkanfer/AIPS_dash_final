@@ -2,42 +2,21 @@
 Function for AIPS DASH
 '''
 import xml.etree.ElementTree as xml
-import tifffile as tfi
-import skimage.measure as sme
-import matplotlib.image as mpimg
-import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image, ImageEnhance
+from PIL import Image
 # from PIL import fromarray
-from numpy import asarray
-from skimage import data, io
-from skimage.filters import threshold_otsu, threshold_local
-from skimage.morphology import convex_hull_image
-import matplotlib.pyplot as plt
-from scipy import ndimage as ndi
+from skimage.filters import threshold_local
 from scipy.ndimage.morphology import binary_opening
-from skimage.morphology import disk, remove_small_objects
 import skimage.morphology as sm
 from skimage.segmentation import watershed
-from skimage import data
-from skimage.filters import rank, gaussian, sobel
-from skimage.util import img_as_ubyte
-from skimage import data, util
-from skimage.measure import regionprops_table
-from skimage.measure import perimeter
 from skimage import measure
-from skimage.exposure import rescale_intensity, histogram
-from skimage.feature import peak_local_max
+from skimage.exposure import rescale_intensity
 import os
-import glob
 import pandas as pd
-from pandas import DataFrame
 from scipy.ndimage.morphology import binary_fill_holes
-from skimage.viewer import ImageViewer
-from skimage import img_as_float
-import time
 import base64
 from datetime import datetime
+from apps.utils.display_and_xml import unique_rand
 
 
 def segmentation_2ch(ch,ch2, rmv_object_nuc, block_size, offset,int_nuc, cyto_seg,
@@ -158,15 +137,23 @@ def save_pil_to_directory(img,bit,mask_name):
              bit:1 np.unit16 or 2 np.unit8
     :return: encoded_image (e_img)
     '''
-    if bit == 1:
+    bit = str(img.dtype)
+    if bit == "bool":
         # binary
         im_pil = Image.fromarray(img)
-    elif bit == 2:
+    elif bit == "int64":
         # 16 image (normal image)
         im_pil = Image.fromarray(np.uint16(img))
     else:
         # ROI mask
-        im_pil = Image.fromarray(np.uint8(img))
+        img = np.uint8(img)
+        roi_index_uni = np.unique(img)
+        roi_index_uni = roi_index_uni[roi_index_uni > 1]
+        sort_mask_buffer = np.ones((np.shape(img)[0], np.shape(img)[1], 3), dtype=np.uint8)
+        for npun in roi_index_uni:
+            for i in range(3):
+                sort_mask_buffer[img == npun, i] = unique_rand(2, 255, 1)[0]
+        im_pil = Image.fromarray(sort_mask_buffer, mode='RGB')
     filename1 = datetime.now().strftime("%Y%m%d_%H%M%S" + mask_name)
     im_pil.save(os.path.join('temp', filename1 + ".png"), format='png')  # this is for image processing
     e_img = base64.b64encode(open(os.path.join('temp', filename1 + ".png"), 'rb').read())
@@ -232,3 +219,4 @@ def seq(start, end, by=None, length_out=None):
     if abs(start + by * length_out - end) < eps:
         out.append(end)
     return out
+

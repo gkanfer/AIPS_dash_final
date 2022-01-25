@@ -161,11 +161,21 @@ def seq(start, end, by=None, length_out=None):
 def evaluate_image_output(mask):
     mask_eval = mask - 1
     mask_eval = np.where(mask_eval == 1, 0, mask_eval)
-    if np.sum(mask_eval) < 10:
+    if np.sum(mask_eval) < 3:
         mask = np.zeros(np.shape(mask_eval))
     else:
         mask = mask
     return mask
+
+def test_image(arr):
+    '''
+    test whether the mask generated is empty
+    :parameter
+    arr - np array
+    '''
+    values, counts = np.unique(arr.ravel(), axis=0, return_counts=True)
+    return counts
+
 def unique_rand(inicial, limit, total):
     '''
     :parameter
