@@ -9,6 +9,7 @@ import inspect
 import xml.etree.ElementTree as xml
 
 #import skimage.color
+import skimage
 import tifffile as tfi
 import skimage.measure as sme
 import matplotlib.image as mpimg
@@ -66,19 +67,127 @@ img = AIPS_object.load_image()
 nuc_s = AIPS_object.Nucleus_segmentation(img['1'], inv=False)
 seg = AIPS_object.Cytosol_segmentation(img['1'],img['0'],nuc_s['sort_mask'],nuc_s['sort_mask_bin'])
 
+
+
+ch2 = img['0']
+#ch2 = ch2*2**16
+ch2 = (ch2/ch2.max())*255
+ch2 = np.uint8(ch2)
+compsite = np.zeros((np.shape(ch2)[0],np.shape(ch2)[1],3),dtype=np.uint8)
+compsite[:,:,0] = ch2
+compsite[:,:,1] = ch2
+compsite[:,:,2] = ch2
+
+
+bf_mask = dx.binary_frame_mask(ch,nuc_s['sort_mask'])
+bf_mask = np.where(bf_mask == 1, True, False)
+
+compsite[bf_mask > 0,1]=255
+im_pil = Image.fromarray(compsite,mode='RGB')
+
+plt.imshow(im_pil)
+
+
+
 ch2 = img['0']
 ch = img['1']
+ch = ch * 65535.000
+im_pil = Image.fromarray(np.uint16(ch))
+im_pil.save(os.path.join('/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/TEST', 'ch2' + ".png"), format='png')
+
 bf_mask = dx.binary_frame_mask(ch,nuc_s['sort_mask'])
+bf_mask = np.where(bf_mask == 1, True, False)
+im_pil = Image.fromarray(bf_mask)
+im_pil.save(os.path.join('/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/TEST', 'mask' + ".png"), format='png')
+
+
+
+
+
+bf_mask = dx.binary_frame_mask(ch,nuc_s['sort_mask'])
+im_pil = Image.fromarray(np.uint16(bf_mask))
+im_pil.save(os.path.join('/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/TEST', 'mask' + ".png"), format='png')
+im_pil = Image.fromarray(ch)
+im_pil.save(os.path.join('/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/TEST', 'ch2' + ".png"), format='png')
+
+
+x = plt.imread('/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/TEST/Composite.png')
+
+
+
 bf_mask = np.uint8(bf_mask)
-plt.imshow(bf_mask)
+bf_mask = np.where(bf_mask > 0, 255,0)
 roi_index_uni = np.unique(bf_mask)
 roi_index_uni
+
+plt.imshow(bf_mask)
+im_pil = Image.fromarray(bf_mask,'L')
+im_pil.save(os.path.join('/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/TEST', 'mask' + ".png"), format='png')
 
 ch2 = img['0']
 ch2 = ch2*2**16
 ch2 = np.uint8(ch2)
-roi_index_uni = np.unique(ch2)
+im_pil = Image.fromarray(ch2)
+im_pil.save(os.path.join('/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/TEST', 'ch2' + ".png"), format='png')
+
+
+
+
+
+bf_mask = bf_mask.reshape(np.shape(bf_mask)[0],np.shape(bf_mask)[1],1,)
+bf_mask = np.concatenate((bf_mask,bf_mask,bf_mask),2)
+bf_mask = bf_mask.reshape(np.shape(bf_mask)[0],np.shape(bf_mask)[1],1,3)
+
+# plt.imshow(bf_mask)
+# roi_index_uni = np.unique(bf_mask)
+
 roi_index_uni
+from skimage import img_as_ubyte
+
+ch2 = img['0']
+#ch2 = ch2*2**16
+ch2 = (ch2/ch2.max())*255
+ch2 = np.uint8(ch2)
+zero = np.zeros((np.shape(ch2)[0],np.shape(ch2)[1],3),dtype=np.uint8)
+zero[:,:,0] = ch2
+zero[:,:,1] = ch2
+zero[:,:,2] = ch2
+zero[zero==,1]
+im_pil = Image.fromarray(zero)
+plt.imshow(im_pil)
+
+
+
+plt.imshow(ch2)
+roi_index_uni = np.unique(ch2)
+ch2[ch2>128]=128
+plt.imshow(ch2)
+zero = np.zeros((np.shape(ch2)[0],np.shape(ch2)[1],3),dtype=np.uint16)
+zero[:,:,0] = ch2
+zero[:,:,1] = ch2
+zero[:,:,2] = ch2
+plt.imshow(zero)
+im_pil = Image.fromarray(zero, mode='RGB')
+plt.imshow(im_pil)
+im_pil.save(os.path.join('/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/TEST', 'test' + ".png"), format='png')
+
+
+
+roi_index_uni
+im1 = Image.fromarray(ch2, mode='1')
+plt.imshow(im1)
+
+zero = np.zeros((np.shape(ch2)[0],np.shape(ch2)[1],3),dtype=np.uint8)
+zero[:,:,0] = bf_mask
+zero[:,:,1] = ch2
+
+
+
+
+
+
+
+
 zero = np.zeros(np.shape(ch2),dtype=np.uint8)
 #image_composite = np.stack((zero,ch2,bf_mask),dtype=np.uint8)
 image_composite = np.zeros((np.shape(ch2)[0], np.shape(ch2)[1], 3), dtype=np.uint8)
@@ -358,6 +467,26 @@ else:
 # ax[0][0].imshow(seg['cell_mask_1'], cmap=plt.cm.gray)
 # ax[0][1].imshow(seg['cseg_mask'], cmap=plt.cm.gray)
 # ax[0][2].imshow(seg['mask_unfiltered'], cmap=plt.cm.gray)
+
+import numpy as np
+from skimage import io
+import os
+
+rgb = io.imread('/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash/app_uploaded_files/rgb.jpg')
+gray = io.imread('/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash/app_uploaded_files/gray.jpg')
+
+rows_rgb, cols_rgb, channels = rgb.shape
+rows_gray, cols_gray = gray.shape
+
+rows_comb = max(rows_rgb, rows_gray)
+cols_comb = cols_rgb + cols_gray
+comb = np.zeros(shape=(rows_comb, cols_comb, channels), dtype=np.uint8)
+
+comb[:rows_rgb, :cols_rgb] = rgb
+comb[:rows_gray, cols_rgb:] = gray[:, :, None]
+
+io.imshow(comb)
+
 
 
 
