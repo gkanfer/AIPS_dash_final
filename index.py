@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "01-26-2021 a"
+git commit -m "01-26-2021 c"
 git push origin -u AIPS_dash_final
 
 '''
