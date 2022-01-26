@@ -8,7 +8,7 @@ from skimage import measure
 import os
 import pandas as pd
 from scipy.ndimage.morphology import binary_fill_holes
-from apps.utils.display_and_xml import evaluate_image_output,test_image
+from utils.display_and_xml import evaluate_image_output,test_image
 
 class AIPS:
     def __init__(self, Image_name, path, rmv_object_nuc, block_size, offset):

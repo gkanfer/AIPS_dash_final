@@ -16,7 +16,7 @@ import pandas as pd
 from scipy.ndimage.morphology import binary_fill_holes
 import base64
 from datetime import datetime
-from apps.utils.display_and_xml import unique_rand
+from utils.display_and_xml import unique_rand
 
 
 def segmentation_2ch(ch,ch2, rmv_object_nuc, block_size, offset,int_nuc, cyto_seg,
@@ -131,7 +131,7 @@ def show_image_adjust(image, low_prec, up_prec):
     # PIL_scaled_ch1.show()
     # return PIL_scaled_ch1
 
-def save_pil_to_directory(img,bit,mask_name):
+def save_pil_to_directory(img,bit,mask_name,output_dir = 'temp'):
     '''
     :param img: image input
              bit:1 np.unit16 or 2 np.unit8
@@ -155,7 +155,7 @@ def save_pil_to_directory(img,bit,mask_name):
                 sort_mask_buffer[img == npun, i] = unique_rand(2, 255, 1)[0]
         im_pil = Image.fromarray(sort_mask_buffer, mode='RGB')
     filename1 = datetime.now().strftime("%Y%m%d_%H%M%S" + mask_name)
-    im_pil.save(os.path.join('temp', filename1 + ".png"), format='png')  # this is for image processing
+    im_pil.save(os.path.join(output_dir, filename1 + ".png"), format='png')  # this is for image processing
     e_img = base64.b64encode(open(os.path.join('temp', filename1 + ".png"), 'rb').read())
     return e_img
 

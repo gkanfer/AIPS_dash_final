@@ -353,7 +353,7 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
     pix = pix * 65535.000
     im_pil = Image.fromarray(np.uint16(pix))
     im_pil.save("1.png", format='png')  # this is for image processing
-    encoded_image = base64.b64encode(open("../1.png", 'rb').read())
+    encoded_image = base64.b64encode(open("1.png", 'rb').read())
     pix_2 = af.show_image_adjust(ch2_, low_prec=low, up_prec=high)
     pix_2 = pix_2 * 65535.000
     im_pil = Image.fromarray(np.uint16(pix_2))
@@ -492,7 +492,7 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
                     next_parameter, width=3))
                 ]
     elif tab_input == 'save-tab':
-            with open('../parameters.csv', 'w') as fp:
+            with open('parameters.csv', 'w') as fp:
                 pass
             return [
                     dbc.Row(html.P('Update the parameters.xml file from the parental folder:')),
