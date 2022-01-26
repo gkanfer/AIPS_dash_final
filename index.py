@@ -1,7 +1,8 @@
 '''
 git add .
 git commit -m "01-26-2021 a"
-git push origin -u AIPS_Dash
+git push origin -u AIPS_dash_final
+
 '''
 
 from app import app
