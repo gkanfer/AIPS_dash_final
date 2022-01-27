@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "01-26-2021 d"
+git commit -m "01-27-2021 adding display functionality"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''

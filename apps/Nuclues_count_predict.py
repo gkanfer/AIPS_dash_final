@@ -22,20 +22,63 @@ from random import randint
 from io import BytesIO
 from flask_caching import Cache
 from dash.long_callback import DiskcacheLongCallbackManager
+import plotly.express as px
 
 from utils.controls import controls, controls_nuc, controls_cyto
 from utils import AIPS_functions as af
 from utils import AIPS_module as ai
+from utils import display_and_xml as dx
 
 import pathlib
 from app import app
 
-
-
-
 PATH = pathlib.Path(__file__).parent
 DATA_PATH = PATH.joinpath("../app_uploaded_files").resolve()
 TEMP_PATH =  PATH.joinpath("../temp").resolve()
+
+# layout to import
+color_drop = dcc.Dropdown(
+    id="color-drop-menu",
+    options=[
+        {"label": col_name.capitalize(), "value": col_name}
+        for col_name in table.columns
+    ],
+    value="label",
+)
+
+image_card = dbc.Card(
+    [
+        dbc.CardHeader(html.H2("Explore object properties")),
+        dbc.CardBody(
+            dbc.Row(
+                dbc.Col(
+                    dcc.Graph(
+                        id="graph",
+                        figure=image_with_contour(
+                            img,
+                            current_labels,
+                            table,
+                            initial_columns,
+                            color_column="area",
+                        ),
+                    ),
+                )
+            )
+        ),
+        dbc.CardFooter(
+            dbc.Row(
+                [
+                    dbc.Col(
+                        "Use the dropdown menu to select which variable to base the colorscale on:"
+                    ),
+                    dbc.Col(color_drop),
+                ],
+                align="center",
+            ),
+        ),
+    ]
+)
+
 
 layout = html.Div([
     html.Div(id='output-nuc-test')])
@@ -75,6 +118,10 @@ def update_nuc(image,channel,high,low,bs,os,ron,bsc,osc,gt,roc,rocs):
     sort_mask = nuc_s['sort_mask']
     ch_ = img[nuc_sel]
     ch2_ = img[cyt_sel]
+    # segmentation traces the nucleus segmented image based on the
+    bf_mask = dx.binary_frame_mask(ch_, nuc_s['sort_mask'])
+    bf_mask = np.where(bf_mask == 1, True, False)
+
     pix = af.show_image_adjust(ch_, low_prec=low, up_prec=high)
     pix = pix * 65535.000
     im_pil = Image.fromarray(np.uint16(pix))
