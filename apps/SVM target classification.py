@@ -38,22 +38,45 @@ PATH = pathlib.Path(__file__).parent
 DATA_PATH = PATH.joinpath("../app_uploaded_files").resolve()
 TEMP_PATH = PATH.joinpath("../temp").resolve()
 
-# layout to import
 
 layout = html.Div(
     [
         dbc.Container(
-            [dbc.Row([
-                dbc.Col(children=[
-                    html.Div(id='output-nuc-image')
-                ])
-                ]),
-            ]
-        )
-        ]
-    )
-@app.callback(
-    Output('output-nuc-image','children'),
+            [
+            html.H1("SVM"),
+            html.Hr(),
+            dcc.Tabs(id = 'tabs-svm', value = '',
+                        children=[
+                            dcc.Tab(label="Selection", id = "Selection-id",value="Selection-val",style={'color': 'black'},selected_style={'color': 'red'},disabled=False ),
+                            dcc.Tab(label="PCA model", id = "PCA-model-id", value="PCA-model-id",style={'color': 'black'},selected_style={'color': 'red'},disabled=True),
+                            dcc.Tab(label="Model generation", id = "Model-generation-id", value="Model-generation-val",style={'color': 'black'},selected_style={'color': 'red'},disabled=True),
+                            dcc.Tab(label="Model test", id = "Model-test-id", value="Model-test-val",style={'color': 'black'},selected_style={'color': 'red'},disabled=True),
+                    ]),
+            html.Div(id='Tab_image_display'),
+            dcc.Store(id='jason_ch'),
+            dcc.Store(id='jason_ch2'),
+            dcc.Store(id='jason_nmask2'),
+            dcc.Store(id='jason_nmask4'),
+            dcc.Store(id='jason_sort_mask'),
+            dcc.Store(id='jason_table'),
+            dcc.Store(id='jason_cell_mask_1'),
+            dcc.Store(id='jason_combine'),
+            dcc.Store(id='jason_cseg_mask'),
+            dcc.Store(id='jason_info_table'),
+            ])
+    ])
+# loading all the data
+@app.callback([
+    Output('jason_ch', 'data'),
+    Output('jason_ch2', 'data'),
+    Output('jason_nmask2', 'data'),
+    Output('jason_nmask4', 'data'),
+    Output('jason_sort_mask', 'data'),
+    Output('jason_table', 'data'),
+    Output('jason_cell_mask_1', 'data'),
+    Output('jason_combine', 'data'),
+    Output('jason_cseg_mask', 'data'),
+    Output('jason_info_table', 'data')],
     [Input('upload-image', 'filename'),
     State('act_ch', 'value'),
     State('high_pass', 'value'),
@@ -67,12 +90,12 @@ layout = html.Div(
     State('rmv_object_cyto', 'value'),
     State('rmv_object_cyto_small', 'value')
      ])
-def update_nuc(image,channel,high,low,bs,os,ron,bsc,osc,gt,roc,rocs):
+def Generate_segmentation_and_table(image,channel,high,low,bs,os,ron,bsc,osc,gt,roc,rocs):
     AIPS_object = ai.Segment_over_seed(Image_name=str(image[0]), path=DATA_PATH, rmv_object_nuc=ron,
                                        block_size=bs,
                                        offset=os,
                                        block_size_cyto=bsc, offset_cyto=osc, global_ther=gt, rmv_object_cyto=roc,
-                                       rmv_object_cyto_small=rocs, remove_border=False)
+                                       rmv_object_cyto_small=rocs, remove_border=True)
     img = AIPS_object.load_image()
     if channel == 1:
         nuc_sel = '0'
@@ -94,51 +117,17 @@ def update_nuc(image,channel,high,low,bs,os,ron,bsc,osc,gt,roc,rocs):
     bf_mask = np.where(bf_mask == 1, True, False)
     composite[bf_mask > 0, 1] = 255
     label_array = nuc_s['sort_mask']
-    current_labels = np.unique(label_array)[np.nonzero(np.unique(label_array))]
-    prop_names = [
-        "label",
-        "area",
-        "perimeter",
-        "eccentricity",
-        "euler_number",
-        "mean_intensity",
-    ]
-    prop_table = measure.regionprops_table(
-        label_array, intensity_image=composite, properties=prop_names)
-    table = pd.DataFrame(prop_table)
-    # Format the Table columns
-    columns = [
-        {"name": label_name, "id": label_name, "selectable": True}
-        if precision is None
-        else {
-            "name": label_name,
-            "id": label_name,
-            "type": "numeric",
-            "selectable": True,
-        }
-        for label_name, precision in zip(prop_names, (None, None, 4, 4, None, 3))]
-    initial_columns = ["label", "area"]
-    #img = img_as_ubyte(color.gray2rgb(composite))
-    img = Image.fromarray(img)
-    label_array = np.pad(label_array, (1,), "constant", constant_values=(0,))
-    return [
-         dbc.CardHeader(html.H2("Explore seed properties", style={'text-align': 'center'})),
-            dbc.CardBody(
-                dbc.Row(
-                    dbc.Col(
-                        dcc.Graph(
-                            id="graph",
-                            figure=image_with_contour(
-                                img,
-                                label_array,
-                                table,
-                                initial_columns,
-                                color_column="area",
-                            ),
-                        ),
-                    )
-                )
-            )]
-
+    json_object_ch = json.dumps(ch)
+    json_object_ch2 = json.dumps(ch2)
+    json_object_nmask2 = json.dumps(nmask2)
+    json_object_nmask4 = json.dumps(nmask4)
+    json_object_sort_mask = json.dumps(sort_mask)
+    json_object_table = table.to_json(orient='split')
+    json_object_cell_mask_1 = json.dumps(cell_mask_1)
+    json_object_combine = json.dumps(combine)
+    json_object_cseg_mask = json.dumps(cseg_mask)
+    json_object_info_table = info_table.to_json(orient='split')
+    return json_object_ch, json_object_ch2, json_object_nmask2, json_object_nmask4, json_object_sort_mask, \
+           json_object_table, json_object_cell_mask_1, json_object_combine, json_object_cseg_mask, json_object_info_table
 
 

@@ -1,10 +1,9 @@
 '''
 git add .
-git commit -m "01-28-2021 display image works, table needs improvement"
+git commit -m "01-28-2021 display image works, start classification module using SVM"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
-
 from app import app
 from app import server
 from apps import Nuclues_count_predict
@@ -39,7 +38,6 @@ from utils import AIPS_module as ai
 
 
 UPLOAD_DIRECTORY = "app_uploaded_files"
-
 
 next_display = dbc.Button('Next', id='display-val', n_clicks=0, color="Primary", className="me-1", style={'padding': '10px 24px'})
 next_Nucleus = dbc.Button('Next', id='Nucleus-val', n_clicks=0, color="success", className="me-1", style={'padding': '10px 24px'})
@@ -579,7 +577,7 @@ def display_page(pathname):
     if pathname == '/apps/Nuclues_count_predict':
         return Nuclues_count_predict.layout
     else:
-        return "404 Page Error! Please choose a link"
+        return "No seed segment were detected, Readjust seed segmentation"
 
 
 @app.callback(Output('load_tab-id', 'disabled'),
