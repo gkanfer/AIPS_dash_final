@@ -97,7 +97,15 @@ img = img_as_ubyte(color.gray2rgb(img))
 img = Image.fromarray(img)
 # plt.imshow(img)
 
-
+# table.iterrows()
+# label = row.label
+# # value = row[color_column]
+# contour = measure.find_contours(current_labels == label, 0.5)[0]
+# for rid, row in table.iterrows():
+#     print(row)
+# np.unique(label_array)
+# label = row.label
+# contour = measure.find_contours(current_labels == label, 0.5)[0]
 def image_with_contour(img, active_labels, data_table, active_columns, color_column):
     """
     Returns a greyscale image that is segmented and superimposed with contour traces of

@@ -1,15 +1,13 @@
 '''
 git add .
-git commit -m "01-27-2021 adding display functionality"
+git commit -m "01-28-2021 display image works, table needs improvement"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
 
 from app import app
 from app import server
-
 from apps import Nuclues_count_predict
-
 import dash_daq as daq
 import json
 import dash
