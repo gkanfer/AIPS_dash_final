@@ -53,30 +53,27 @@ layout = html.Div(
                             dcc.Tab(label="Model test", id = "Model-test-id", value="Model-test-val",style={'color': 'black'},selected_style={'color': 'red'},disabled=True),
                     ]),
             html.Div(id='Tab_image_display'),
-            dcc.Store(id='jason_ch'),
+            html.Div(id='Tab_table_display'),
             dcc.Store(id='jason_ch2'),
-            dcc.Store(id='jason_nmask2'),
-            dcc.Store(id='jason_nmask4'),
-            dcc.Store(id='jason_sort_mask'),
-            dcc.Store(id='jason_table'),
-            dcc.Store(id='jason_cell_mask_1'),
-            dcc.Store(id='jason_combine'),
-            dcc.Store(id='jason_cseg_mask'),
-            dcc.Store(id='jason_info_table'),
+            dcc.Store(id='json_ch2_gs_rgb'), #3ch
+            dcc.Store(id='json_ch2_gs_pil_rgb'),
+            dcc.Store(id='json_ch2_seed_gs_pil_rgb'),
+            dcc.Store(id='json_ch2_seed_target_gs_pil_rgb'),
+            dcc.Store(id='json_mask_seed'),
+            dcc.Store(id='json_mask_target'),
+            dcc.Store(id='json_table_prop'),
             ])
     ])
 # loading all the data
 @app.callback([
-    Output('jason_ch', 'data'),
     Output('jason_ch2', 'data'),
-    Output('jason_nmask2', 'data'),
-    Output('jason_nmask4', 'data'),
-    Output('jason_sort_mask', 'data'),
-    Output('jason_table', 'data'),
-    Output('jason_cell_mask_1', 'data'),
-    Output('jason_combine', 'data'),
-    Output('jason_cseg_mask', 'data'),
-    Output('jason_info_table', 'data')],
+    Output('json_ch2_gs_rgb', 'data'),
+    Output('json_ch2_gs_pil_rgb', 'data'),
+    Output('json_ch2_seed_gs_pil_rgb', 'data'),
+    Output('json_ch2_seed_target_gs_pil_rgb', 'data'),
+    Output('json_mask_seed','data'),
+    Output('json_mask_target','data'),
+    Output('json_table_prop','data')],
     [Input('upload-image', 'filename'),
     State('act_ch', 'value'),
     State('high_pass', 'value'),
@@ -91,6 +88,15 @@ layout = html.Div(
     State('rmv_object_cyto_small', 'value')
      ])
 def Generate_segmentation_and_table(image,channel,high,low,bs,os,ron,bsc,osc,gt,roc,rocs):
+    '''
+    Genrate
+    3 channel grayscale target PIL RGB
+    3 channel grayscale target PIL RGB image with seed segment
+    3 channel grayscale target PIL RGB image with seed and target segment
+    complete feture table
+    32int seed mask
+    32int target mask
+    '''
     AIPS_object = ai.Segment_over_seed(Image_name=str(image[0]), path=DATA_PATH, rmv_object_nuc=ron,
                                        block_size=bs,
                                        offset=os,
@@ -103,31 +109,165 @@ def Generate_segmentation_and_table(image,channel,high,low,bs,os,ron,bsc,osc,gt,
     else:
         nuc_sel = '1'
         cyt_sel = '0'
+    ch = img[nuc_sel]
+    ch2 = img[cyt_sel]
     nuc_s = AIPS_object.Nucleus_segmentation(img[nuc_sel])
-    ch_ = img[nuc_sel]
+    seg = AIPS_object.Cytosol_segmentation(ch, ch2, nuc_s['sort_mask'], nuc_s['sort_mask_bin'])
     # segmentation traces the nucleus segmented image based on the
-    ch_ = (ch_ / ch_.max()) * 255
-    ch_ = np.uint8(ch_)
-    composite = np.zeros((np.shape(ch_)[0], np.shape(ch_)[1], 3), dtype=np.uint8)
-    composite[:, :, 0] = ch_
-    composite[:, :, 1] = ch_
-    composite[:, :, 2] = ch_
-    img = composite
-    bf_mask = dx.binary_frame_mask(composite, nuc_s['sort_mask'])
+    ch2 = (ch2 / ch2.max()) * 255
+    ch2_u8 = np.uint8(ch2)
+    bf_mask = dx.binary_frame_mask(ch2_u8, seg['sort_mask_sync'])
     bf_mask = np.where(bf_mask == 1, True, False)
+    c_mask = dx.binary_frame_mask(ch2_u8, seg['cseg_mask'])
+    c_mask = np.where(c_mask == 1, True, False)
+    rgb_input_img = np.zeros((np.shape(ch2_u8)[0], np.shape(ch2_u8)[1], 3), dtype=np.uint8)
+    rgb_input_img[:, :, 0] = ch2_u8
+    rgb_input_img[:, :, 1] = ch2_u8
+    rgb_input_img[:, :, 2] = ch2_u8
+    img_input_rgb_pil = Image.fromarray(rgb_input_img) # 3 channel grayscale no segmentation
+    composite = np.zeros((np.shape(ch2)[0], np.shape(ch2)[1], 3), dtype=np.uint8)
+    composite[c_mask > 0, 0] = 255
     composite[bf_mask > 0, 1] = 255
-    label_array = nuc_s['sort_mask']
-    json_object_ch = json.dumps(ch)
-    json_object_ch2 = json.dumps(ch2)
-    json_object_nmask2 = json.dumps(nmask2)
-    json_object_nmask4 = json.dumps(nmask4)
-    json_object_sort_mask = json.dumps(sort_mask)
-    json_object_table = table.to_json(orient='split')
-    json_object_cell_mask_1 = json.dumps(cell_mask_1)
-    json_object_combine = json.dumps(combine)
-    json_object_cseg_mask = json.dumps(cseg_mask)
-    json_object_info_table = info_table.to_json(orient='split')
-    return json_object_ch, json_object_ch2, json_object_nmask2, json_object_nmask4, json_object_sort_mask, \
-           json_object_table, json_object_cell_mask_1, json_object_combine, json_object_cseg_mask, json_object_info_table
+    composite[:, :, 2] = ch2
+    img_nuc_cyto_rgb_pil = Image.fromarray(composite) #3 channel grayscale with seed and target segmented
+    composite = np.zeros((np.shape(ch2)[0], np.shape(ch2)[1], 3), dtype=np.uint8)
+    composite[c_mask > 0, 0] = 255
+    composite[:, :, 1] = ch2_u8
+    composite[:, :, 2] = ch2_u8
+    img_cyto_rgb_pil = Image.fromarray(composite) #3 channel grayscale with seed segmented
+    cseg_mask = seg['cseg_mask']
+    #label_array = nuc_s['sort_mask']
+    prop_names = [
+        "label",
+        "area",
+        "area_bbox",
+        "area_convex",
+        "area_filled",
+        "axis_major_length",
+        "axis_minor_length",
+        "eccentricity",
+        "equivalent_diameter_area",
+        "euler_number",
+        "extent",
+        "feret_diameter_max",
+        "image_intensity",
+        "inertia_tensor",
+        "inertia_tensor_eigvals",
+        "intensity_max",
+        "intensity_mean",
+        "intensity_min",
+        "moments",
+        "moments_central",
+        "moments_hu",
+        "moments_normalized",
+        "moments_weighted",
+        "moments_weighted_central",
+        "moments_weighted_hu",
+        "moments_weighted_normalized",
+        "orientation",
+        "perimeter",
+        "perimeter_crofton",
+        "slice",
+        "solidity"
+    ]
+    table_prop = measure.regionprops_table(
+        cseg_mask, intensity_image=rgb_input_img, properties=prop_names
+    )
+    json_object_ch2 = json.dumps(ch2.tolist())
+    json_object_ch2_gs_rgb = json.dumps(rgb_input_img.tolist())
+    json_object_ch2_gs_pil_rgb = json.dumps(img_input_rgb_pil.tolist())
+    json_object_ch2_seed_gs_pil_rgb = json.dumps(img_cyto_rgb_pil.tolist())
+    json_object_ch2_seed_target_gs_pil_rgb = json.dumps(img_nuc_cyto_rgb_pil.tolist())
+    json_object_mask_seed = json.dumps(seg['sort_mask_sync'].tolist())
+    json_object_mask_target = json.dumps(seg['cseg_mask'].tolist())
+    json_object_table_prop = table_prop.to_json(orient='split')
+    return json_object_ch2,json_object_ch2_gs_rgb ,json_object_ch2_gs_pil_rgb, json_object_ch2_seed_gs_pil_rgb, json_object_ch2_seed_target_gs_pil_rgb\
+            ,json_object_mask_seed,json_object_mask_target,json_object_table_prop
 
+
+### load image and table side by side
+@app.callback(
+            [Output('Tab_image_display', 'children'),
+             Output('Tab_table_display', 'children')],
+            [Input('json_object_ch2', 'data'),
+            Input('json_object_ch2_gs_rgb', 'data'),
+            Input('json_object_ch2_gs_pil_rgb', 'data'),
+            Input('json_object_ch2_seed_gs_pil_rgb', 'data'),
+            Input('json_object_ch2_seed_target_gs_pil_rgb', 'data'),
+            Input('json_object_mask_seed', 'data'),
+            Input('json_object_mask_target', 'data'),
+            Input('json_object_table_prop', 'data')])
+def load_image_and_table(json_object_ch2_gs_rgb,json_object_ch2_gs_pil_rgb, json_object_ch2_seed_gs_pil_rgb,
+                         json_object_ch2_seed_target_gs_pil_rgb,json_object_mask_seed,json_object_mask_target, json_object_table_prop):
+    ch2_rgb = json.loads(json_object_ch2_gs_rgb)
+    ch2_rgb_pil = json.loads(json_object_ch2_gs_pil_rgb)
+    ch2_seed_gs_pil_rgb = json.loads(json_object_ch2_seed_gs_pil_rgb)
+    ch2_seed_target_gs_pil_rgb = json.loads(json_object_ch2_seed_target_gs_pil_rgb)
+    mask_seed = json.loads(json_object_mask_seed)
+    mask_target = json.loads(json_object_mask_target)
+    table_prop = pd.read_json(json_object_table_prop,orient='split')
+    table = table_prop.iloc[:,[0,1,2,4,10,14]]
+    prop_names = []
+    [prop_names.append(str(i)) for i in table.columns]
+    columns = [
+        {"name": label_name, "id": label_name, "selectable": True}
+        if precision is None
+        else {
+            "name": label_name,
+            "id": label_name,
+            "type": "numeric",
+            "selectable": True,
+        }
+        for label_name, precision in zip(prop_names, (None, None, 4, 4, None, 3))]
+    initial_columns = ["label", "area"]
+    return [
+            dbc.CardHeader(html.H2("Explore seed properties - SVM", style={'text-align': 'center'})),
+            dbc.CardBody(
+                dbc.Row(
+                    dbc.Col(
+                        dcc.Graph(
+                            id="graph",
+                            figure=image_with_contour(
+                                ch2_seed_gs_pil_rgb,
+                                mask_target,
+                                table,
+                                initial_columns,
+                                color_column="area",
+                            ),
+                        ),
+                    )
+                )
+            ),
+        dbc.CardBody(
+            dbc.Row(
+                dbc.Col(
+                    [
+                        dash_table.DataTable(
+                            id="table-line",
+                            columns=columns,
+                            data=table.to_dict("records"),
+                            tooltip_header={
+                                col: "Select columns with the checkbox to include them in the hover info of the image."
+                                for col in table.columns
+                            },
+                            style_header={
+                                "textDecoration": "underline",
+                                "textDecorationStyle": "dotted",
+                            },
+                            tooltip_delay=0,
+                            tooltip_duration=None,
+                            filter_action="native",
+                            row_deletable=True,
+                            column_selectable="multi",
+                            selected_columns=initial_columns,
+                            style_table={"overflowY": "scroll"},
+                            fixed_rows={"headers": False, "data": 0},
+                            style_cell={"width": "85px"},
+                            page_size=10,
+                        ),
+                        html.Div(id="row", hidden=True, children=None),
+                    ]
+                )
+            )),
+             ]
 

@@ -1,2 +1,2 @@
 block_size,offset,rmv_object_nuc,block_size_cyto,offset_cyto,global_ther,rmv_object_cyto,rmv_object_cyto_small
-13,0.001,0.3,13,0.001,0.3,0.99,0.99
+59,-6.873403371632e-05,0.62,7,-0.00013502294045759672,0.3,0.88,0.26

@@ -48,15 +48,45 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 path = '/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/'
 #Composite.tif10.tif
-AIPS_object = ai.Segment_over_seed(Image_name='dmsot0273_0003-512.tif', path=path, rmv_object_nuc=0.5, block_size=59,
-                                           offset=-0.0004,block_size_cyto=59, offset_cyto=-0.0004, global_ther=0.2, rmv_object_cyto=0.1,
-                                           rmv_object_cyto_small=0.1, remove_border=False)
+AIPS_object = ai.Segment_over_seed(Image_name='dmsot0273_0003-512.tif', path=path, rmv_object_nuc=0.5, block_size=83,
+                                           offset=0.00001,block_size_cyto=11, offset_cyto=-0.0003, global_ther=0.4, rmv_object_cyto=0.99,
+                                           rmv_object_cyto_small=0.2, remove_border=False)
 
 img = AIPS_object.load_image()
 nuc_s = AIPS_object.Nucleus_segmentation(img['1'], inv=False)
 ch = img['1']
 ch2 = img['0']
 #ch2 = ch2*2**16
+ch2 = (ch2/ch2.max())*255
+ch2 = np.uint8(ch2)
+composite = np.zeros((np.shape(ch2)[0],np.shape(ch2)[1],3),dtype=np.uint8)
+composite[:,:,0] = ch2
+composite[:,:,1] = ch2
+composite[:,:,2] = ch2
+plt.imshow(nuc_s['sort_mask'])
+bf_mask = dx.binary_frame_mask(ch,nuc_s['sort_mask'])
+bf_mask = np.where(bf_mask == 1, True, False)
+composite[bf_mask > 0,1]=255
+im_pil = Image.fromarray(composite,mode='RGB')
+table_nuc = nuc_s['table']
+
+#plt.imshow(im_pil)
+#segmant cytosol
+
+
+seg = AIPS_object.Cytosol_segmentation( ch,ch2,nuc_s['sort_mask'],nuc_s['sort_mask_bin'])
+plt.imshow(seg['cseg_mask'])
+bf_mask = dx.binary_frame_mask(ch,seg['sort_mask_sync'])
+bf_mask = np.where(bf_mask == 1, True, False)
+c_mask = dx.binary_frame_mask(ch,seg['cseg_mask'])
+c_mask = np.where(c_mask == 1, True, False)
+
+composite[bf_mask > 0,1]=255
+composite[c_mask > 0,0]=255
+im_pil = Image.fromarray(composite,mode='RGB')
+plt.imshow(im_pil)
+
+
 ch2 = (ch2/ch2.max())*255
 ch2 = np.uint8(ch2)
 composite = np.zeros((np.shape(ch2)[0],np.shape(ch2)[1],3),dtype=np.uint8)
@@ -70,7 +100,9 @@ composite[bf_mask > 0,1]=255
 im_pil = Image.fromarray(composite,mode='RGB')
 table_nuc = nuc_s['table']
 
-#plt.imshow(im_pil)
+
+
+
 
 for col in table_nuc.columns:
     print(col)
@@ -111,3 +143,16 @@ img = img_as_ubyte(color.gray2rgb(img))
 img = Image.fromarray(img)
 label_array = np.pad(label_array, (1,), "constant", constant_values=(0,))
 plt.imshow(label_array)
+
+dict = {'x':np.linspace(1,10,10,dtype=np.int),'y':np.linspace(1,10,10,dtype=np.int),'z':np.linspace(1,10,10,dtype=np.int)}
+test = pd.DataFrame(dict)
+test.head()
+test_1 = test.iloc[:,[1,2]]
+test_1.head()
+
+list_column = []
+[list_column.append(str(i)) for i in test.columns]
+prop_names
+
+for col in test.columns:
+    list_column.append(col)

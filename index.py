@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "01-28-2021 display image works, start classification module using SVM"
+git commit -m "01-30-2021 display image works, classification module using SVM"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
