@@ -38,8 +38,9 @@ PATH = pathlib.Path(__file__).parent
 DATA_PATH = PATH.joinpath("../app_uploaded_files").resolve()
 TEMP_PATH = PATH.joinpath("../temp").resolve()
 
+df = pd.read_csv(os.path.join(PATH,'parameters.csv'))
 
-layout = html.Div(
+target_layout = html.Div(
     [
         dbc.Container(
             [

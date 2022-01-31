@@ -278,3 +278,27 @@ controls_cyto = dbc.Card(
          ],
         body=True,
     )
+
+upload_parm = dbc.Row([
+                dbc.Col([
+                     dcc.Upload(
+                            id='upload-csv',
+                            children=html.Div([
+                                'Drag and Drop or ',
+                                html.A('Select Files')
+                            ]),
+                            style={
+                                'width': '100%',
+                                'height': '60px',
+                                'lineHeight': '60px',
+                                'borderWidth': '1px',
+                                'borderStyle': 'dashed',
+                                'borderRadius': '5px',
+                                'textAlign': 'center',
+                                'margin': '10px'
+                            },
+                            # Allow multiple files to be uploaded
+                            multiple=True
+                        ),
+                    html.Button('Upload parameters', id='submit-parameters', n_clicks=0)])
+                    ])

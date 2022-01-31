@@ -1,12 +1,12 @@
 '''
 git add .
-git commit -m "01-30-2021 display image works, classification module using SVM"
+git commit -m "01-31-2021 display Updating table is not working very well"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
 from app import app
 from app import server
-from apps import Nuclues_count_predict
+from apps import Nuclues_count_predict, SVM_target_classification
 import dash_daq as daq
 import json
 import dash
@@ -31,7 +31,8 @@ from io import BytesIO
 from flask_caching import Cache
 from dash.long_callback import DiskcacheLongCallbackManager
 
-from utils.controls import controls, controls_nuc, controls_cyto
+from utils.Dash_functions import parse_contents
+from utils.controls import controls, controls_nuc, controls_cyto, upload_parm
 from utils import AIPS_functions as af
 from utils import AIPS_module as ai
 #import xml.etree.ElementTree as xml
@@ -101,6 +102,10 @@ app.layout = dbc.Container(
                                 [
                         controls_cyto,
                                 ],title='Target segmentation config'),
+                                dbc.AccordionItem(children=
+                                [
+                        upload_parm,
+                                ],title='Upload parameters'),
                             ],start_collapsed=True)
                 ],width={"size": 4}),
             dbc.Col([
@@ -125,12 +130,12 @@ app.layout = dbc.Container(
                 dcc.Store(id='jason_cseg_mask'),
                 dcc.Store(id='jason_info_table'),
                 dcc.Store(id='jason_image_name'),
+                dcc.Store(id='jason_parameters'),
                 dcc.Loading(html.Div(id='img-output'),type="circle",style={'height': '100%', 'width': '100%'}),
                 html.Div(id="test-image-name",hidden=True),
                 dcc.Interval(id = 'interval',interval=1000,max_intervals=2,disabled=True)
                # dcc.Loading(html.Img(id='img-output',style={'height': '100%', 'width': '100%'})),
             ])])])
-
 
 
 @app.callback(
@@ -507,17 +512,16 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
     elif tab_input == "Module-tab":
         return [
             dbc.Accordion(
-            [
+            [html.Div([
+                dcc.Location(id='url', refresh=False),
+                html.Div(id='page-content', children=[]),
+                ]),
                 dbc.AccordionItem(
                     title="Nucleus activation Module",
                     children=[
-                        html.Div([
-                            dcc.Location(id='url', refresh=False),
                             html.Div([
                                 dcc.Link('Nucleus prediction test|', href='/apps/Nuclues_count_predict'),
                             ], className="row"),
-                            html.Div(id='page-content', children=[])
-                        ]),
                         daq.NumericInput(
                             id='Nuc_per_img',
                             label='Nucleus selected per image',
@@ -538,7 +542,15 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
                     ]
                 ),
                 dbc.AccordionItem(
-                    "This is the content of the second section", title="Item 2"
+                    title="Target classification using SVM",
+                    children=[
+                        html.Div([
+                            dcc.Location(id='url', refresh=False),
+                            html.Div([
+                                dcc.Link('Target classification|', href='/apps/SVM_target_classification'),
+                            ], className="row"),
+                            html.Div(id='page-content', children=[])
+                        ])]
                 ),
                 dbc.AccordionItem(
                     "This is the content of the third section", title="Item 3"
@@ -551,6 +563,7 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
 @app.callback(
     Output('Progress', 'value'),
     [Input("btn_update", "n_clicks"),
+    State('act_ch','value'),
     State('block_size','value'),
     State('offset','value'),
     State('rmv_object_nuc','value'),
@@ -560,15 +573,16 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
     State('rmv_object_cyto', 'value'),
     State('rmv_object_cyto_small', 'value'),
     ])
-def Load_parameters_xml(nnn,bs,os,ron,bsc,osc,gt,roc,rocs):
-    dict = {'block_size':[bs],'offset':[os],'rmv_object_nuc':[ron],'block_size_cyto':[bsc],
+def Load_parameters_xml(nnn,channel,bs,os,ron,bsc,osc,gt,roc,rocs):
+    dict = {'act_ch':[channel],'block_size':[bs],'offset':[os],'rmv_object_nuc':[ron],'block_size_cyto':[bsc],
             'offset_cyto':[osc], 'global_ther':[gt],
             'rmv_object_cyto':[roc],'rmv_object_cyto_small':[rocs]}
     #af.XML_creat('parameters.xml',str(bs),str(os),str(ron),str(bsc),str(osc),str(gt),str(roc),str(rocs))
     df = pd.DataFrame(dict)
     df.to_csv('parameters.csv', encoding='utf-8', index=False)
     return [html.P("done")]
-# 01/17/22 c
+
+
 
 #loading link
 @app.callback(Output('page-content', 'children'),
@@ -576,8 +590,73 @@ def Load_parameters_xml(nnn,bs,os,ron,bsc,osc,gt,roc,rocs):
 def display_page(pathname):
     if pathname == '/apps/Nuclues_count_predict':
         return Nuclues_count_predict.layout
+    elif pathname == '/apps/SVM_target_classification':
+        return SVM_target_classification.layout
     else:
         return "No seed segment were detected, Readjust seed segmentation"
+
+# loading parameters file
+
+@app.callback(
+    [
+    Output('act_ch', 'value'),
+     Output('block_size','value'),
+     Output('offset','value'),
+     Output('rmv_object_nuc','value'),
+     Output('block_size_cyto', 'value'),
+     Output('offset_cyto', 'value'),
+     Output('global_ther', 'value'),
+     Output('rmv_object_cyto', 'value'),
+     Output('rmv_object_cyto_small', 'value')],
+    [Input('submit-parameters', 'n_clicks'),
+     State('upload-csv', 'filename'),
+     State('upload-csv', 'contents')])
+def Load_image(n,pram,cont):
+    # if n is None:
+    #     return dash.no_update,dash.no_update,dash.no_update,dash.no_update,dash.no_update,dash.no_update,dash.no_update,dash.no_update,dash.no_update
+    parameters = parse_contents(cont,pram)
+    channel = parameters['act_ch']
+    bs = parameters['block_size'][0]
+    os = parameters['offset'][0]
+    ron = parameters['rmv_object_nuc'][0]
+    bsc = parameters['block_size_cyto'][0]
+    osc = parameters['offset_cyto'][0]
+    gt = parameters['global_ther'][0]
+    roc = parameters['rmv_object_cyto'][0]
+    rocs = parameters['rmv_object_cyto_small'][0]
+    jason_object_parameters = parameters.to_json(orient='split')
+    return channel, bs, os , ron ,bsc ,osc ,gt, roc, rocs
+#
+# @app.callback(
+#     [Output('jason_parameters', 'data'),
+#     Output('act_ch', 'value'),
+#      Output('block_size','value'),
+#      Output('offset','value'),
+#      Output('rmv_object_nuc','value'),
+#      Output('block_size_cyto', 'value'),
+#      Output('offset_cyto', 'value'),
+#      Output('global_ther', 'value'),
+#      Output('rmv_object_cyto', 'value'),
+#      Output('rmv_object_cyto_small', 'value')],
+#     [Input('submit-parameters', 'n_clicks'),
+#      State('upload-csv', 'filename'),
+#      State('upload-csv', 'contents')], prevent_initial_call=True)
+# def Load_image(n,pram,cont):
+#     # if n is None:
+#     #     return [dash.no_update, dash.no_update,dash.no_update,dash.no_update,dash.no_update,
+#     #             dash.no_update,dash.no_update,dash.no_update,dash.no_update,dash.no_update,]
+#     parameters = parse_contents(cont,pram)
+#     channel = parameters['act_ch']
+#     bs = parameters['block_size'][0]
+#     os = parameters['offset'][0]
+#     ron = parameters['rmv_object_nuc'][0]
+#     bsc = parameters['block_size_cyto'][0]
+#     osc = parameters['offset_cyto'][0]
+#     gt = parameters['global_ther'][0]
+#     roc = parameters['rmv_object_cyto'][0]
+#     rocs = parameters['rmv_object_cyto_small'][0]
+#     jason_object_parameters = parameters.to_json(orient='split')
+#     return jason_object_parameters, channel, bs, os , ron ,bsc ,osc ,gt, roc, rocs
 
 
 @app.callback(Output('load_tab-id', 'disabled'),
