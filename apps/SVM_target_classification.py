@@ -30,6 +30,7 @@ from utils.Display_composit import image_with_contour
 from utils import AIPS_functions as af
 from utils import AIPS_module as ai
 from utils import display_and_xml as dx
+from utils.Dash_functions import parse_contents
 
 import pathlib
 from app import app
@@ -63,155 +64,140 @@ layout = html.Div(
             dcc.Store(id='json_mask_seed'),
             dcc.Store(id='json_mask_target'),
             dcc.Store(id='json_table_prop'),
-            dcc.Store(id='json_table_parameters'),
             ])
     ])
-# loading table_parameters
-# @app.callback([Output('act_ch', 'value'),
-#                 Output('high_pass', 'value'),
-#                 Output('low_pass', 'value'),
-#                 Output('block_size','value'),
-#                 Output('offset','value'),
-#                 Output('rmv_object_nuc','value'),
-#                 Output('block_size_cyto', 'value'),
-#                 Output('offset_cyto', 'value'),
-#                 Output('global_ther', 'value'),
-#                 Output('rmv_object_cyto', 'value'),
-#                 Output('rmv_object_cyto_small', 'value')],
-#                 Input('jason_object_parameters', 'data'))
-# def update_parameters_target(pt):
-#     pt
-#     pass
-#     #table_parameters = pd.read_json(pt, orient='split')
 
 
-#
-# # loading all the data
-# @app.callback([
-#     Output('jason_ch2', 'data'),
-#     Output('json_ch2_gs_rgb', 'data'),
-#     Output('json_ch2_gs_pil_rgb', 'data'),
-#     Output('json_ch2_seed_gs_pil_rgb', 'data'),
-#     Output('json_ch2_seed_target_gs_pil_rgb', 'data'),
-#     Output('json_mask_seed','data'),
-#     Output('json_mask_target','data'),
-#     Output('json_table_prop','data')],
-#     [Input('upload-image', 'filename'),
-#     Input('jason_object_parameters', 'data'),
-#     State('act_ch', 'value'),
-#     State('high_pass', 'value'),
-#     State('low_pass', 'value'),
-#     State('block_size','value'),
-#     State('offset','value'),
-#     State('rmv_object_nuc','value'),
-#     State('block_size_cyto', 'value'),
-#     State('offset_cyto', 'value'),
-#     State('global_ther', 'value'),
-#     State('rmv_object_cyto', 'value'),
-#     State('rmv_object_cyto_small', 'value')
-#      ])
-# def Generate_segmentation_and_table(image,jp,channel,high,low,bs,os,ron,bsc,osc,gt,roc,rocs):
-#     '''
-#     Genrate
-#     3 channel grayscale target PIL RGB
-#     3 channel grayscale target PIL RGB image with seed segment
-#     3 channel grayscale target PIL RGB image with seed and target segment
-#     complete feture table
-#     32int seed mask
-#     32int target mask
-#     '''
-#     jp
-#     if jp:
-#         table_parameters = pd.read_json(jp, orient='split')
-#         AIPS_object = ai.Segment_over_seed(Image_name=str(image[0]), path=DATA_PATH, rmv_object_nuc=ron,
-#                                            block_size=bs,
-#                                            offset=os,
-#                                            block_size_cyto=bsc, offset_cyto=osc, global_ther=gt, rmv_object_cyto=roc,
-#                                            rmv_object_cyto_small=rocs, remove_border=True)
-#     else:
-#         table_parameters = pd.read_json(jp, orient='split')
-#
-#     img = AIPS_object.load_image()
-#     if channel == 1:
-#         nuc_sel = '0'
-#         cyt_sel = '1'
-#     else:
-#         nuc_sel = '1'
-#         cyt_sel = '0'
-#     ch = img[nuc_sel]
-#     ch2 = img[cyt_sel]
-#     nuc_s = AIPS_object.Nucleus_segmentation(img[nuc_sel])
-#     seg = AIPS_object.Cytosol_segmentation(ch, ch2, nuc_s['sort_mask'], nuc_s['sort_mask_bin'])
-#     # segmentation traces the nucleus segmented image based on the
-#     ch2 = (ch2 / ch2.max()) * 255
-#     ch2_u8 = np.uint8(ch2)
-#     bf_mask = dx.binary_frame_mask(ch2_u8, seg['sort_mask_sync'])
-#     bf_mask = np.where(bf_mask == 1, True, False)
-#     c_mask = dx.binary_frame_mask(ch2_u8, seg['cseg_mask'])
-#     c_mask = np.where(c_mask == 1, True, False)
-#     rgb_input_img = np.zeros((np.shape(ch2_u8)[0], np.shape(ch2_u8)[1], 3), dtype=np.uint8)
-#     rgb_input_img[:, :, 0] = ch2_u8
-#     rgb_input_img[:, :, 1] = ch2_u8
-#     rgb_input_img[:, :, 2] = ch2_u8
-#     img_input_rgb_pil = Image.fromarray(rgb_input_img) # 3 channel grayscale no segmentation
-#     composite = np.zeros((np.shape(ch2)[0], np.shape(ch2)[1], 3), dtype=np.uint8)
-#     composite[c_mask > 0, 0] = 255
-#     composite[bf_mask > 0, 1] = 255
-#     composite[:, :, 2] = ch2
-#     img_nuc_cyto_rgb_pil = Image.fromarray(composite) #3 channel grayscale with seed and target segmented
-#     composite = np.zeros((np.shape(ch2)[0], np.shape(ch2)[1], 3), dtype=np.uint8)
-#     composite[c_mask > 0, 0] = 255
-#     composite[:, :, 1] = ch2_u8
-#     composite[:, :, 2] = ch2_u8
-#     img_cyto_rgb_pil = Image.fromarray(composite) #3 channel grayscale with seed segmented
-#     cseg_mask = seg['cseg_mask']
-#     #label_array = nuc_s['sort_mask']
-#     prop_names = [
-#         "label",
-#         "area",
-#         "area_bbox",
-#         "area_convex",
-#         "area_filled",
-#         "axis_major_length",
-#         "axis_minor_length",
-#         "eccentricity",
-#         "equivalent_diameter_area",
-#         "euler_number",
-#         "extent",
-#         "feret_diameter_max",
-#         "image_intensity",
-#         "inertia_tensor",
-#         "inertia_tensor_eigvals",
-#         "intensity_max",
-#         "intensity_mean",
-#         "intensity_min",
-#         "moments",
-#         "moments_central",
-#         "moments_hu",
-#         "moments_normalized",
-#         "moments_weighted",
-#         "moments_weighted_central",
-#         "moments_weighted_hu",
-#         "moments_weighted_normalized",
-#         "orientation",
-#         "perimeter",
-#         "perimeter_crofton",
-#         "slice",
-#         "solidity"
-#     ]
-#     table_prop = measure.regionprops_table(
-#         cseg_mask, intensity_image=rgb_input_img, properties=prop_names
-#     )
-#     json_object_ch2 = json.dumps(ch2.tolist())
-#     json_object_ch2_gs_rgb = json.dumps(rgb_input_img.tolist())
-#     json_object_ch2_gs_pil_rgb = json.dumps(img_input_rgb_pil.tolist())
-#     json_object_ch2_seed_gs_pil_rgb = json.dumps(img_cyto_rgb_pil.tolist())
-#     json_object_ch2_seed_target_gs_pil_rgb = json.dumps(img_nuc_cyto_rgb_pil.tolist())
-#     json_object_mask_seed = json.dumps(seg['sort_mask_sync'].tolist())
-#     json_object_mask_target = json.dumps(seg['cseg_mask'].tolist())
-#     json_object_table_prop = table_prop.to_json(orient='split')
-#     return json_object_ch2,json_object_ch2_gs_rgb ,json_object_ch2_gs_pil_rgb, json_object_ch2_seed_gs_pil_rgb, json_object_ch2_seed_target_gs_pil_rgb\
-#             ,json_object_mask_seed,json_object_mask_target,json_object_table_prop
+# # # loading all the data
+@app.callback([
+    Output('jason_ch2', 'data'),
+    Output('json_ch2_gs_rgb', 'data'),
+    Output('json_ch2_gs_pil_rgb', 'data'),
+    Output('json_ch2_seed_gs_pil_rgb', 'data'),
+    Output('json_ch2_seed_target_gs_pil_rgb', 'data'),
+    Output('json_mask_seed','data'),
+    Output('json_mask_target','data'),
+    Output('json_table_prop','data')],
+   [Input('upload-image', 'filename'),
+    State('act_ch', 'value'),
+    State('high_pass', 'value'),
+    State('low_pass', 'value'),
+    State('block_size','value'),
+    State('offset','value'),
+    State('offset_store','data'),
+    State('rmv_object_nuc','value'),
+    State('block_size_cyto', 'value'),
+    State('offset_cyto','value'),
+    State('offset_cyto_store', 'data'),
+    State('global_ther', 'value'),
+    State('rmv_object_cyto', 'value'),
+    State('rmv_object_cyto_small', 'value')
+     ])
+def Generate_segmentation_and_table(image,n,pram,cont,channel,high,low,bs,os,osd,ron,bsc,osc,oscd,gt,roc,rocs):
+    '''
+    Genrate
+    3 channel grayscale target PIL RGB
+    3 channel grayscale target PIL RGB image with seed segment
+    3 channel grayscale target PIL RGB image with seed and target segment
+    complete feture table
+    32int seed mask
+    32int target mask
+    '''
+    #test wheter paramters are from csv file
+    if osd is None:
+        os=os
+    else:
+        os=osd
+    if oscd is None:
+        osc=osc
+    else:
+        osc=oscd
+    AIPS_object = ai.Segment_over_seed(Image_name=str(image[0]), path=DATA_PATH, rmv_object_nuc=ron,
+                                       block_size=bs,
+                                       offset=os,
+                                       block_size_cyto=bsc, offset_cyto=osc, global_ther=gt, rmv_object_cyto=roc,
+                                       rmv_object_cyto_small=rocs, remove_border=True)
+    img = AIPS_object.load_image()
+    if channel == 1:
+        nuc_sel = '0'
+        cyt_sel = '1'
+    else:
+        nuc_sel = '1'
+        cyt_sel = '0'
+    ch = img[nuc_sel]
+    ch2 = img[cyt_sel]
+    nuc_s = AIPS_object.Nucleus_segmentation(img[nuc_sel])
+    seg = AIPS_object.Cytosol_segmentation(ch, ch2, nuc_s['sort_mask'], nuc_s['sort_mask_bin'])
+    # segmentation traces the nucleus segmented image based on the
+    ch2 = (ch2 / ch2.max()) * 255
+    ch2_u8 = np.uint8(ch2)
+    bf_mask = dx.binary_frame_mask(ch2_u8, seg['sort_mask_sync'])
+    bf_mask = np.where(bf_mask == 1, True, False)
+    c_mask = dx.binary_frame_mask(ch2_u8, seg['cseg_mask'])
+    c_mask = np.where(c_mask == 1, True, False)
+    rgb_input_img = np.zeros((np.shape(ch2_u8)[0], np.shape(ch2_u8)[1], 3), dtype=np.uint8)
+    rgb_input_img[:, :, 0] = ch2_u8
+    rgb_input_img[:, :, 1] = ch2_u8
+    rgb_input_img[:, :, 2] = ch2_u8
+    img_input_rgb_pil = Image.fromarray(rgb_input_img) # 3 channel grayscale no segmentation
+    composite = np.zeros((np.shape(ch2)[0], np.shape(ch2)[1], 3), dtype=np.uint8)
+    composite[c_mask > 0, 0] = 255
+    composite[bf_mask > 0, 1] = 255
+    composite[:, :, 2] = ch2
+    img_nuc_cyto_rgb_pil = Image.fromarray(composite) #3 channel grayscale with seed and target segmented
+    composite = np.zeros((np.shape(ch2)[0], np.shape(ch2)[1], 3), dtype=np.uint8)
+    composite[c_mask > 0, 0] = 255
+    composite[:, :, 1] = ch2_u8
+    composite[:, :, 2] = ch2_u8
+    img_cyto_rgb_pil = Image.fromarray(composite) #3 channel grayscale with seed segmented
+    cseg_mask = seg['cseg_mask']
+    #label_array = nuc_s['sort_mask']
+    prop_names = [
+        "label",
+        "area",
+        "area_bbox",
+        "area_convex",
+        "area_filled",
+        "axis_major_length",
+        "axis_minor_length",
+        "eccentricity",
+        "equivalent_diameter_area",
+        "euler_number",
+        "extent",
+        "feret_diameter_max",
+        "image_intensity",
+        "inertia_tensor",
+        "inertia_tensor_eigvals",
+        "intensity_max",
+        "intensity_mean",
+        "intensity_min",
+        "moments",
+        "moments_central",
+        "moments_hu",
+        "moments_normalized",
+        "moments_weighted",
+        "moments_weighted_central",
+        "moments_weighted_hu",
+        "moments_weighted_normalized",
+        "orientation",
+        "perimeter",
+        "perimeter_crofton",
+        "slice",
+        "solidity"
+    ]
+    table_prop = measure.regionprops_table(
+        cseg_mask, intensity_image=rgb_input_img, properties=prop_names
+    )
+    json_object_ch2 = json.dumps(ch2.tolist())
+    json_object_ch2_gs_rgb = json.dumps(rgb_input_img.tolist())
+    json_object_ch2_gs_pil_rgb = json.dumps(img_input_rgb_pil.tolist())
+    json_object_ch2_seed_gs_pil_rgb = json.dumps(img_cyto_rgb_pil.tolist())
+    json_object_ch2_seed_target_gs_pil_rgb = json.dumps(img_nuc_cyto_rgb_pil.tolist())
+    json_object_mask_seed = json.dumps(seg['sort_mask_sync'].tolist())
+    json_object_mask_target = json.dumps(seg['cseg_mask'].tolist())
+    json_object_table_prop = table_prop.to_json(orient='split')
+    return json_object_ch2,json_object_ch2_gs_rgb ,json_object_ch2_gs_pil_rgb, json_object_ch2_seed_gs_pil_rgb, json_object_ch2_seed_target_gs_pil_rgb\
+            ,json_object_mask_seed,json_object_mask_target,json_object_table_prop
 
 #
 # ### load image and table side by side

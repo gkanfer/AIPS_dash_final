@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "01-31-2021 display Updating table is not working very well"
+git commit -m "01-31-2021 solve uploading parameters from csv table"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
@@ -101,13 +101,13 @@ app.layout = dbc.Container(
                                 dbc.AccordionItem(children=
                                 [
                         controls_cyto,
-                                ],title='Target segmentation config'),
+                                ], title='Target segmentation config'),
                                 dbc.AccordionItem(children=
                                 [
                         upload_parm,
-                                ],title='Upload parameters'),
-                            ],start_collapsed=True)
-                ],width={"size": 4}),
+                                ], title='Update parameters'),
+                            ], start_collapsed=True)
+            ], width={"size": 4}),
             dbc.Col([
                 dcc.Tabs(id = 'tabs', value = '',
                         children=[
@@ -131,11 +131,52 @@ app.layout = dbc.Container(
                 dcc.Store(id='jason_info_table'),
                 dcc.Store(id='jason_image_name'),
                 dcc.Store(id='jason_parameters'),
+                dcc.Store(id='offset_store',data=None),
+                dcc.Store(id='offset_cyto_store',data=None),
                 dcc.Loading(html.Div(id='img-output'),type="circle",style={'height': '100%', 'width': '100%'}),
                 html.Div(id="test-image-name",hidden=True),
                 dcc.Interval(id = 'interval',interval=1000,max_intervals=2,disabled=True)
                # dcc.Loading(html.Img(id='img-output',style={'height': '100%', 'width': '100%'})),
             ])])])
+
+# loading parameters file
+#
+# Output('offset', 'value'),
+# Output('rmv_object_nuc', 'value'),
+# Output('block_size_cyto', 'value'),
+# Output('offset_cyto', 'value'),
+# Output('global_ther', 'value'),
+# Output('rmv_object_cyto', 'value'),
+# Output('rmv_object_cyto_small', 'value')
+@app.callback(
+    [Output('act_ch', 'value'),
+    Output('block_size', 'value'),
+    Output('offset_store', 'data'),
+    Output('rmv_object_nuc', 'value'),
+    Output('block_size_cyto', 'value'),
+    Output('offset_cyto_store', 'data'),
+    Output('global_ther', 'value'),
+    Output('rmv_object_cyto', 'value'),
+    Output('rmv_object_cyto_small', 'value')
+     ],
+    [Input('submit-parameters', 'n_clicks'),
+     State('upload-csv', 'filename'),
+     State('upload-csv', 'contents')])
+def Load_image(n,pram,cont):
+    if n is None:
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update,\
+               dash.no_update,dash.no_update, dash.no_update, dash.no_update
+    parameters = parse_contents(cont,pram)
+    channel = int(parameters['act_ch'][0])
+    bs = parameters['block_size'][0]
+    os = parameters['offset'][0]
+    ron = parameters['rmv_object_nuc'][0]
+    bsc = parameters['block_size_cyto'][0]
+    osc = parameters['offset_cyto'][0]
+    gt = parameters['global_ther'][0]
+    roc = parameters['rmv_object_cyto'][0]
+    rocs = parameters['rmv_object_cyto_small'][0]
+    return channel,bs,os,ron,bsc,osc,gt,roc,rocs
 
 
 @app.callback(
@@ -595,68 +636,6 @@ def display_page(pathname):
     else:
         return "No seed segment were detected, Readjust seed segmentation"
 
-# loading parameters file
-
-@app.callback(
-    [
-    Output('act_ch', 'value'),
-     Output('block_size','value'),
-     Output('offset','value'),
-     Output('rmv_object_nuc','value'),
-     Output('block_size_cyto', 'value'),
-     Output('offset_cyto', 'value'),
-     Output('global_ther', 'value'),
-     Output('rmv_object_cyto', 'value'),
-     Output('rmv_object_cyto_small', 'value')],
-    [Input('submit-parameters', 'n_clicks'),
-     State('upload-csv', 'filename'),
-     State('upload-csv', 'contents')])
-def Load_image(n,pram,cont):
-    # if n is None:
-    #     return dash.no_update,dash.no_update,dash.no_update,dash.no_update,dash.no_update,dash.no_update,dash.no_update,dash.no_update,dash.no_update
-    parameters = parse_contents(cont,pram)
-    channel = parameters['act_ch']
-    bs = parameters['block_size'][0]
-    os = parameters['offset'][0]
-    ron = parameters['rmv_object_nuc'][0]
-    bsc = parameters['block_size_cyto'][0]
-    osc = parameters['offset_cyto'][0]
-    gt = parameters['global_ther'][0]
-    roc = parameters['rmv_object_cyto'][0]
-    rocs = parameters['rmv_object_cyto_small'][0]
-    jason_object_parameters = parameters.to_json(orient='split')
-    return channel, bs, os , ron ,bsc ,osc ,gt, roc, rocs
-#
-# @app.callback(
-#     [Output('jason_parameters', 'data'),
-#     Output('act_ch', 'value'),
-#      Output('block_size','value'),
-#      Output('offset','value'),
-#      Output('rmv_object_nuc','value'),
-#      Output('block_size_cyto', 'value'),
-#      Output('offset_cyto', 'value'),
-#      Output('global_ther', 'value'),
-#      Output('rmv_object_cyto', 'value'),
-#      Output('rmv_object_cyto_small', 'value')],
-#     [Input('submit-parameters', 'n_clicks'),
-#      State('upload-csv', 'filename'),
-#      State('upload-csv', 'contents')], prevent_initial_call=True)
-# def Load_image(n,pram,cont):
-#     # if n is None:
-#     #     return [dash.no_update, dash.no_update,dash.no_update,dash.no_update,dash.no_update,
-#     #             dash.no_update,dash.no_update,dash.no_update,dash.no_update,dash.no_update,]
-#     parameters = parse_contents(cont,pram)
-#     channel = parameters['act_ch']
-#     bs = parameters['block_size'][0]
-#     os = parameters['offset'][0]
-#     ron = parameters['rmv_object_nuc'][0]
-#     bsc = parameters['block_size_cyto'][0]
-#     osc = parameters['offset_cyto'][0]
-#     gt = parameters['global_ther'][0]
-#     roc = parameters['rmv_object_cyto'][0]
-#     rocs = parameters['rmv_object_cyto_small'][0]
-#     jason_object_parameters = parameters.to_json(orient='split')
-#     return jason_object_parameters, channel, bs, os , ron ,bsc ,osc ,gt, roc, rocs
 
 
 @app.callback(Output('load_tab-id', 'disabled'),
