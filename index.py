@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "01-31-2021 solve uploading parameters from csv table"
+git commit -m "01-31-2021 table and image display table no functionality"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
@@ -119,18 +119,6 @@ app.layout = dbc.Container(
                             dcc.Tab(label="Select module for activation", id = "Module-tab-id", value="Module-tab",style={'color': 'black'},selected_style={'color': 'red'},disabled=False)
                     ]),
                 html.Div(id='run_content'),
-                dcc.Store(id='jason_ch'),
-                dcc.Store(id='jason_ch2'),
-                dcc.Store(id='jason_nmask2'),
-                dcc.Store(id='jason_nmask4'),
-                dcc.Store(id='jason_sort_mask'),
-                dcc.Store(id='jason_table'),
-                dcc.Store(id='jason_cell_mask_1'),
-                dcc.Store(id='jason_combine'),
-                dcc.Store(id='jason_cseg_mask'),
-                dcc.Store(id='jason_info_table'),
-                dcc.Store(id='jason_image_name'),
-                dcc.Store(id='jason_parameters'),
                 dcc.Store(id='offset_store',data=None),
                 dcc.Store(id='offset_cyto_store',data=None),
                 dcc.Loading(html.Div(id='img-output'),type="circle",style={'height': '100%', 'width': '100%'}),
@@ -139,15 +127,7 @@ app.layout = dbc.Container(
                # dcc.Loading(html.Img(id='img-output',style={'height': '100%', 'width': '100%'})),
             ])])])
 
-# loading parameters file
-#
-# Output('offset', 'value'),
-# Output('rmv_object_nuc', 'value'),
-# Output('block_size_cyto', 'value'),
-# Output('offset_cyto', 'value'),
-# Output('global_ther', 'value'),
-# Output('rmv_object_cyto', 'value'),
-# Output('rmv_object_cyto_small', 'value')
+# loading parameters file from local csv table
 @app.callback(
     [Output('act_ch', 'value'),
     Output('block_size', 'value'),
@@ -185,6 +165,8 @@ def Load_image(n,pram,cont):
      State('upload-image', 'filename'),
      State('upload-image', 'contents')])
 def Load_image(n,image,cont):
+    if n is None:
+        return dash.no_update
     for name, data_a in zip(image, cont):
         data = data_a.encode("utf8").split(b";base64,")[1]
         with open(os.path.join(UPLOAD_DIRECTORY, name), "wb") as fp:
