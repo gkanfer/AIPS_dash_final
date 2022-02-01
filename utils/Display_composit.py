@@ -94,7 +94,7 @@ def image_with_contour(img, active_labels, data_table, active_columns, color_col
             x=x,
             y=y,
             name=label,
-            opacity=0.8,
+            opacity=0.2,
             mode="lines",
             line=dict(color=mpl.colors.rgb2hex(cmap(norm(value))),),
             fill="toself",

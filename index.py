@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "01-31-2021 table and image display table no functionality"
+git commit -m "02-01-2021 table and image display table no functionality"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
@@ -105,6 +105,7 @@ app.layout = dbc.Container(
                                 dbc.AccordionItem(children=
                                 [
                         upload_parm,
+                        html.Div(id='Tab_table_display'),
                                 ], title='Update parameters'),
                             ], start_collapsed=True)
             ], width={"size": 4}),

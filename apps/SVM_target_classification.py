@@ -55,7 +55,6 @@ layout = html.Div(
                             dcc.Tab(label="Model test", id = "Model-test-id", value="Model-test-val",style={'color': 'black'},selected_style={'color': 'red'},disabled=True),
                     ]),
             html.Div(id='Tab_image_display'),
-            html.Div(id='Tab_table_display'),
             dcc.Store(id='jason_ch2'),
             dcc.Store(id='json_ch2_gs_rgb'), #3ch
             dcc.Store(id='json_mask_seed'),
@@ -333,7 +332,7 @@ def highlight_filter(
     filtered_labels = _table.loc[indices, "label"].values
     filtered_table = _table.query("label in @filtered_labels")
     fig = image_with_contour(
-        img_input_rgb_pil, mask_target, filtered_table, active_columns, color_column
+        img_input_rgb_pil, filtered_labels, filtered_table, active_columns, color_column
     )
 
     if cell_index and cell_index["row"] != previous_row:
