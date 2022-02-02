@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "02-02-2021 main app - display image sync"
+git commit -m "02-02-2021 main app - display image sync table sync no color"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
@@ -105,9 +105,11 @@ app.layout = dbc.Container(
                                 dbc.AccordionItem(children=
                                 [
                         upload_parm,
-                        html.Div(id='Tab_table_display'),
+
                                 ], title='Update parameters'),
-                            ], start_collapsed=True)
+                            ], start_collapsed=True),
+                html.Br(),
+                html.Div(id='Tab_table_display'),
             ], width={"size": 4}),
             dbc.Col([
                 dcc.Tabs(id = 'tabs', value = '',

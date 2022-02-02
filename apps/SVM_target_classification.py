@@ -63,6 +63,7 @@ layout = html.Div(
             dcc.Store(id='json_mask_target'),
             dcc.Store(id='json_table_prop'),
             dcc.Store(id='json_img'),
+            dcc.Store(id = 'json_selected_roi'),
             ])
     ])
 
@@ -85,8 +86,7 @@ layout = html.Div(
     State('offset_cyto_store', 'data'),
     State('global_ther', 'value'),
     State('rmv_object_cyto', 'value'),
-    State('rmv_object_cyto_small', 'value')
-     ])
+    State('rmv_object_cyto_small', 'value')])
 def Generate_segmentation_and_table(image,channel,bs,os,osd,ron,bsc,osc,oscd,gt,roc,rocs):
     '''
     Genrate
@@ -152,7 +152,7 @@ def Generate_segmentation_and_table(image,channel,bs,os,osd,ron,bsc,osc,oscd,gt,
         "orientation",
         "perimeter",
         "perimeter_crofton",
-        "slice",
+        # "slice",
         "solidity"
     ]
     table_prop = measure.regionprops_table(
@@ -170,7 +170,8 @@ def Generate_segmentation_and_table(image,channel,bs,os,osd,ron,bsc,osc,oscd,gt,
 # generate selected map
 @app.callback(
     [Output("dump", "children"),
-     Output('json_img','data')],
+     Output('json_img','data'),
+     Output('json_selected_roi','data')],
     [Input("graph","clickData"),
     Input('jason_ch2', 'data'),
     Input('json_ch2_gs_rgb', 'data'),
@@ -179,7 +180,7 @@ def Generate_segmentation_and_table(image,channel,bs,os,osd,ron,bsc,osc,oscd,gt,
     # Input('json_table_prop', 'data')])
 def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_object_mask_seed,json_object_mask_target):
     if clickData is None:
-        return dash.no_update,dash.no_update
+        return dash.no_update,dash.no_update,dash.no_update
     else:
         #load 3d np array with seed segmentation
         ch2_rgb = np.array(json.loads(json_object_ch2_gs_rgb))
@@ -193,7 +194,8 @@ def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_objec
         c_mask = np.where(c_mask == 1, True, False)
         ch2_rgb[c_mask > 0, 2] = 255
         json_object_fig_updata = json.dumps(ch2_rgb.tolist())
-        return json.dumps(clickData, indent=2),json_object_fig_updata
+        roi_sel = json.dumps(value.tolist())
+        return json.dumps(clickData, indent=2),json_object_fig_updata,roi_sel
 
 @app.callback(
             Output('Tab_image_display', 'children'),
@@ -212,9 +214,91 @@ def display_image(json_img,json_ch2_gs_rgb):
     else:
         img_input_rgb_pil = Image.fromarray(img_jason)
         fig = px.imshow(img_input_rgb_pil, binary_string=True, binary_backend="jpg", )
-        return dcc.Graph(
-            id="graph",
-            figure=fig)
+        return dcc.Graph(id="graph",figure=fig)
+
+#
+# @app.callback([Output('table-line', 'columns'),
+#                Output('table-line', 'data')],
+#                 Input('json_table_prop', 'data'))
+# def load_image_and_table(table_prop):
+#     dict = {'x':[1,2],'y':[2,3]}
+#     table = pd.DataFrame(dict)
+#     columns = [{"name": i, "id": i} for i in table.columns],
+#     data = table.to_dict("rows")
+#     return columns, data
+
+
+#
+@app.callback(Output('Tab_table_display', 'children'),
+            Input('json_table_prop', 'data'))
+def load_image_and_table(table_prop):
+     table = pd.read_json(table_prop,orient='split')
+     #table = table.iloc[:,0:5]
+     table['id'] = table.index
+     return  [dbc.Card([
+             dbc.CardBody(
+                 dbc.Row(
+                     dbc.Col(
+                         [
+                             dash_table.DataTable(
+                                 id="table-line",
+                                 # columns=columns,
+                                 data=table.to_dict("records"),
+                                 columns= [{"name": i, "id": i}
+                                           for i in table.columns],
+                                 # columns = [{"name": label_name, "id": label_name,"type": "numeric", "selectable": True}
+                                 #            for label_name in table.columns],
+                                 tooltip_delay=0,
+                                 tooltip_duration=None,
+                                 filter_action="native",
+                                 row_deletable=True,
+                                 column_selectable="multi",
+                                 style_table={"overflowX": "scroll"},
+                                 fixed_rows={"headers": False, "data": 0},
+                                 style_cell={"width": "85px"},
+                                 row_selectable="multi",
+                                 style_data_conditional={"filter_query":'0',"backgroundColor": "yellow",},
+                                 page_size=10,
+                             ),
+                         ]
+                     )
+                 )),
+                 ])]
+
+#
+# @app.callback(
+#     Output("table-line", "style_data_conditional"),
+#     [Input("table-line", "derived_viewport_selected_row_ids"),
+#     Input('json_selected_roi', 'data'),])
+# def style_selected_rows(selRows,roi):
+#     if selRows is None:
+#         return dash.no_update
+#     else:
+#         roi = json.loads(roi.tolist())
+#         return [
+#             {"if": {"filter_query": "{{id}} ={}".format(i)}, "backgroundColor": "yellow",}
+#             for i in selRows
+#         ]
+
+
+
+
+#
+# @app.callback(
+#     Output("table-line", "style_data_conditional"),
+#     [Input("table-line", "derived_viewport_selected_row_ids"),
+#     Input('json_selected_roi', 'data'),])
+# def style_selected_rows(selRows,roi):
+#     if selRows is None:
+#         return dash.no_update
+#     else:
+#         roi = json.loads(roi.tolist())
+#         return [
+#             {"if": {"filter_query": "{{id}} ={}".format(i)}, "backgroundColor": "yellow",}
+#             for i in selRows
+#         ]
+
+
 
 # @app.callback(
 #             [Output('Tab_image_display', 'children'),

@@ -125,7 +125,7 @@ app.layout = html.Div(
                                 dash_table.DataTable(
                                     id="table-line",
                                     columns=columns,
-                                    # data=table.to_dict("records"),
+                                    data=table.to_dict("records"),
                                     # tooltip_header={
                                     #     col: "Select columns with the checkbox to include them in the hover info of the image."
                                     #     for col in table.columns
