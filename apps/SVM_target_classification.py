@@ -1,3 +1,4 @@
+# use my interpretation of display segmentation
 import dash_daq as daq
 import json
 import dash
@@ -55,11 +56,13 @@ layout = html.Div(
                             dcc.Tab(label="Model test", id = "Model-test-id", value="Model-test-val",style={'color': 'black'},selected_style={'color': 'red'},disabled=True),
                     ]),
             html.Div(id='Tab_image_display'),
+            html.Div(id='dump',hidden=True),
             dcc.Store(id='jason_ch2'),
             dcc.Store(id='json_ch2_gs_rgb'), #3ch
             dcc.Store(id='json_mask_seed'),
             dcc.Store(id='json_mask_target'),
             dcc.Store(id='json_table_prop'),
+            dcc.Store(id='json_img'),
             ])
     ])
 
@@ -130,17 +133,7 @@ def Generate_segmentation_and_table(image,channel,bs,os,osd,ron,bsc,osc,oscd,gt,
     rgb_input_img[:, :, 0] = ch2_u8
     rgb_input_img[:, :, 1] = ch2_u8
     rgb_input_img[:, :, 2] = ch2_u8
-    img_input_rgb_pil = Image.fromarray(rgb_input_img) # 3 channel grayscale no segmentation
-    composite = np.zeros((np.shape(ch2)[0], np.shape(ch2)[1], 3), dtype=np.uint8)
-    composite[c_mask > 0, 0] = 255
-    composite[bf_mask > 0, 1] = 255
-    composite[:, :, 2] = ch2
-    img_nuc_cyto_rgb_pil = Image.fromarray(composite) #3 channel grayscale with seed and target segmented
-    composite = np.zeros((np.shape(ch2)[0], np.shape(ch2)[1], 3), dtype=np.uint8)
-    composite[c_mask > 0, 0] = 255
-    composite[:, :, 1] = ch2_u8
-    composite[:, :, 2] = ch2_u8
-    img_cyto_rgb_pil = Image.fromarray(composite) #3 channel grayscale with seed segmented
+    rgb_input_img[bf_mask > 0, 1] = 255 # 3d grayscale array where green channel is for seed segmentation
     cseg_mask = seg['cseg_mask']
     #label_array = nuc_s['sort_mask']
     prop_names = [
@@ -166,194 +159,236 @@ def Generate_segmentation_and_table(image,channel,bs,os,osd,ron,bsc,osc,oscd,gt,
         cseg_mask, intensity_image=rgb_input_img, properties=prop_names
     )
     json_object_ch2 = json.dumps(ch2.tolist())
-    json_object_ch2_gs_rgb = json.dumps(rgb_input_img.tolist())
+    json_object_ch2_seed_gs_rgb = json.dumps(rgb_input_img.tolist())
     json_object_mask_seed = json.dumps(seg['sort_mask_sync'].tolist())
     json_object_mask_target = json.dumps(seg['cseg_mask'].tolist())
     json_object_table_prop = pd.DataFrame(table_prop).to_json(orient='split')
-    return json_object_ch2,json_object_ch2_gs_rgb ,json_object_mask_seed,json_object_mask_target,json_object_table_prop
+    return json_object_ch2,json_object_ch2_seed_gs_rgb ,json_object_mask_seed,json_object_mask_target,json_object_table_prop
 
 #
 # ### load image and table side by side
-dcc.Store(id='jason_ch2'),
-dcc.Store(id='json_ch2_gs_rgb'), #3ch
-dcc.Store(id='json_mask_seed'),
-dcc.Store(id='json_mask_target'),
-dcc.Store(id='json_table_prop'),
-
+# generate selected map
+@app.callback(
+    [Output("dump", "children"),
+     Output('json_img','data')],
+    [Input("graph","clickData"),
+    Input('jason_ch2', 'data'),
+    Input('json_ch2_gs_rgb', 'data'),
+    Input('json_mask_seed', 'data'),
+    Input('json_mask_target', 'data')])
+    # Input('json_table_prop', 'data')])
+def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_object_mask_seed,json_object_mask_target):
+    if clickData is None:
+        return dash.no_update,dash.no_update
+    else:
+        #load 3d np array with seed segmentation
+        ch2_rgb = np.array(json.loads(json_object_ch2_gs_rgb))
+        # select seed counter
+        mask_target = np.array(json.loads(json_object_mask_target))
+        points = clickData['points']
+        value = mask_target[points[0]['x'],points[0]['y']]
+        bf_mask_sel = np.zeros(np.shape(mask_target),dtype=np.int32)
+        bf_mask_sel[mask_target == value] = value
+        c_mask = dx.binary_frame_mask_single_point(bf_mask_sel)
+        c_mask = np.where(c_mask == 1, True, False)
+        ch2_rgb[c_mask > 0, 2] = 255
+        json_object_fig_updata = json.dumps(ch2_rgb.tolist())
+        return json.dumps(clickData, indent=2),json_object_fig_updata
 
 @app.callback(
-            [Output('Tab_image_display', 'children'),
-             Output('Tab_table_display', 'children')],
-            [Input('jason_ch2', 'data'),
-            Input('json_ch2_gs_rgb', 'data'),
-            Input('json_mask_seed', 'data'),
-            Input('json_mask_target', 'data'),
-            Input('json_table_prop', 'data')])
-def load_image_and_table(_ch2_jason,json_object_ch2_gs_rgb,json_object_mask_seed,json_object_mask_target, json_object_table_prop):
-    ch2_rgb = np.array(json.loads(json_object_ch2_gs_rgb))
-    mask_seed = np.array(json.loads(json_object_mask_seed))
-    mask_target = np.array(json.loads(json_object_mask_target))
-    table_prop = pd.read_json(json_object_table_prop,orient='split')
-    table = table_prop.iloc[:,[0,1,2,4,10,14]]
-    prop_names = []
-    [prop_names.append(str(i)) for i in table.columns]
-    columns = [
-        {"name": label_name, "id": label_name, "selectable": True}
-        if precision is None
-        else {
-            "name": label_name,
-            "id": label_name,
-            "type": "numeric",
-            "selectable": True,
-        }
-        for label_name, precision in zip(prop_names, (None, None, None, None, None, None))]
-    initial_columns = ["label", "area"]
-    # create a rgb pil images
-    img = img_as_ubyte(color.gray2rgb(ch2_rgb))
-    img_input_rgb_pil = Image.fromarray(img)  # 3 channel grayscale no segmentation
-    mask_target = np.pad(mask_target, (1,), "constant", constant_values=(0,))
-    return [dbc.Card([
-            dbc.CardHeader(html.H2("Explore seed properties - SVM", style={'text-align': 'center'})),
-            dbc.CardBody(
-                dbc.Row(
-                    dbc.Col(
-                        dcc.Graph(
-                            id="graph",
-                            figure=image_with_contour(
-                                img_input_rgb_pil,
-                                mask_target,
-                                table,
-                                initial_columns,
-                                color_column="area",
-                            ),
-                        ),
-                    )
-                )
-            ),
-            dcc.Dropdown(
-                id="color-drop-menu",
-                options=[
-                    {"label": col_name.capitalize(), "value": col_name}
-                    for col_name in table.columns
-                ],
-                value="label",
-            ),]),
-        dbc.Card([
-        dbc.CardBody(
-            dbc.Row(
-                dbc.Col(
-                    [
-                        dash_table.DataTable(
-                            id="table-line",
-                            columns=columns,
-                            data=table.to_dict("records"),
-                            tooltip_header={
-                                col: "Select columns with the checkbox to include them in the hover info of the image."
-                                for col in table.columns
-                            },
-                            style_header={
-                                "textDecoration": "underline",
-                                "textDecorationStyle": "dotted",
-                            },
-                            tooltip_delay=0,
-                            tooltip_duration=None,
-                            filter_action="native",
-                            row_deletable=True,
-                            column_selectable="multi",
-                            selected_columns=initial_columns,
-                            style_table={"overflowY": "scroll"},
-                            fixed_rows={"headers": False, "data": 0},
-                            style_cell={"width": "85px"},
-                            page_size=10,
-                        ),
-                        html.Div(id="row", hidden=True, children=None),
-                    ]
-                )
-            )),
-            ]) ]
+            Output('Tab_image_display', 'children'),
+            [Input('json_img','data'),
+             Input('json_ch2_gs_rgb', 'data')])
+def display_image(json_img,json_ch2_gs_rgb):
+    try:
+        img_jason = img_as_ubyte(color.gray2rgb(np.array(json.loads(json_img))))
+    except:
+        img = img_as_ubyte(color.gray2rgb(np.array(json.loads(json_ch2_gs_rgb))))
+        img_input_rgb_pil = Image.fromarray(img)
+        fig = px.imshow(img_input_rgb_pil, binary_string=True, binary_backend="jpg", )
+        return dcc.Graph(
+            id="graph",
+            figure=fig)
+    else:
+        img_input_rgb_pil = Image.fromarray(img_jason)
+        fig = px.imshow(img_input_rgb_pil, binary_string=True, binary_backend="jpg", )
+        return dcc.Graph(
+            id="graph",
+            figure=fig)
 
+# @app.callback(
+#             [Output('Tab_image_display', 'children'),
+#              Output('Tab_table_display', 'children')],
+#             [Input('jason_ch2', 'data'),
+#             Input('json_ch2_gs_rgb', 'data'),
+#             Input('json_mask_seed', 'data'),
+#             Input('json_mask_target', 'data'),
+#             Input('json_table_prop', 'data')])
+# def load_image_and_table(_ch2_jason,json_object_ch2_gs_rgb,json_object_mask_seed,json_object_mask_target, json_object_table_prop):
+#     ch2_rgb = np.array(json.loads(json_object_ch2_gs_rgb))
+#     mask_seed = np.array(json.loads(json_object_mask_seed))
+#     mask_target = np.array(json.loads(json_object_mask_target))
+#     table_prop = pd.read_json(json_object_table_prop,orient='split')
+#     table = table_prop.iloc[:,[0,1,2,4,10,14]]
+#     prop_names = []
+#     [prop_names.append(str(i)) for i in table.columns]
+#     columns = [
+#         {"name": label_name, "id": label_name, "selectable": True}
+#         if precision is None
+#         else {
+#             "name": label_name,
+#             "id": label_name,
+#             "type": "numeric",
+#             "selectable": True,
+#         }
+#         for label_name, precision in zip(prop_names, (None, None, None, None, None, None))]
+#     initial_columns = ["label", "area"]
+#     # create a rgb pil images
+#     img = img_as_ubyte(color.gray2rgb(ch2_rgb))
+#     img_input_rgb_pil = Image.fromarray(img)  # 3 channel grayscale no segmentation
+#     mask_target = np.pad(mask_target, (1,), "constant", constant_values=(0,))
+#     return [dbc.Card([
+#             dbc.CardHeader(html.H2("Explore seed properties - SVM", style={'text-align': 'center'})),
+#             dbc.CardBody(
+#                 dbc.Row(
+#                     dbc.Col(
+#                         dcc.Graph(
+#                             id="graph",
+#                             figure=image_with_contour(
+#                                 img_input_rgb_pil,
+#                                 mask_target,
+#                                 table,
+#                                 initial_columns,
+#                                 color_column="area",
+#                             ),
+#                         ),
+#                     )
+#                 )
+#             ),
+#             dcc.Dropdown(
+#                 id="color-drop-menu",
+#                 options=[
+#                     {"label": col_name.capitalize(), "value": col_name}
+#                     for col_name in table.columns
+#                 ],
+#                 value="label",
+#             ),]),
+#         dbc.Card([
+#         dbc.CardBody(
+#             dbc.Row(
+#                 dbc.Col(
+#                     [
+#                         dash_table.DataTable(
+#                             id="table-line",
+#                             columns=columns,
+#                             data=table.to_dict("records"),
+#                             tooltip_header={
+#                                 col: "Select columns with the checkbox to include them in the hover info of the image."
+#                                 for col in table.columns
+#                             },
+#                             style_header={
+#                                 "textDecoration": "underline",
+#                                 "textDecorationStyle": "dotted",
+#                             },
+#                             tooltip_delay=0,
+#                             tooltip_duration=None,
+#                             filter_action="native",
+#                             row_deletable=True,
+#                             column_selectable="multi",
+#                             selected_columns=initial_columns,
+#                             style_table={"overflowY": "scroll"},
+#                             fixed_rows={"headers": False, "data": 0},
+#                             style_cell={"width": "85px"},
+#                             page_size=10,
+#                         ),
+#                         html.Div(id="row", hidden=True, children=None),
+#                     ]
+#                 )
+#             )),
+#             ]) ]
+#
 
-
-@app.callback(
-    Output("table-line", "style_data_conditional"),
-    [Input("graph", "hoverData")],
-    prevent_initial_call=True,
-)
-def higlight_row(string):
-    """
-    When hovering hover label, highlight corresponding row in table,
-    using label column.
-    """
-    index = string["points"][0]["customdata"]
-    return [
-        {
-            "if": {"filter_query": "{label} eq %d" % index},
-            "backgroundColor": "#3D9970",
-            "color": "white",
-        }
-    ]
-
-
-@app.callback(
-    [
-        Output("graph", "figure"),
-        Output("row", "children"),
-    ],
-    [
-        Input("table-line", "derived_virtual_indices"),
-        Input("table-line", "active_cell"),
-        Input("table-line", "selected_columns"),
-    ],
-    [State("color-drop-menu", "value"),
-     State('json_ch2_gs_rgb', 'data'),
-     State('json_mask_seed', 'data'),
-     State('json_mask_target', 'data'),
-     State('json_table_prop', 'data')
-     ],
-    prevent_initial_call=True,
-)
-def highlight_filter(
-    indices, cell_index, active_columns, color_column, previous_row, json_ch2_gs_rgb, json_mask_seed, json_mask_target, json_table_prop):
-    """
-    Updates figure and labels array when a selection is made in the table.
-    When a cell is selected (active_cell), highlight this particular label
-    with a red outline.
-    When the set of filtered labels changes, or when a row is deleted.
-    """
-    # If no color column is selected, open a popup to ask the user to select one.
-    ch2_rgb = np.array(json.loads(json_ch2_gs_rgb))
-    mask_seed = np.array(json.loads(json_mask_seed))
-    mask_target = np.array(json.loads(json_mask_target))
-    img = img_as_ubyte(color.gray2rgb(ch2_rgb))
-    img_input_rgb_pil = Image.fromarray(img)  # 3 channel grayscale no segmentation
-    mask_target = np.pad(mask_target, (1,), "constant", constant_values=(0,))
-    table_prop = pd.read_json(json_table_prop, orient='split')
-    _table = table_prop.iloc[:, [0, 1, 2, 4, 10, 14]]
-    filtered_labels = _table.loc[indices, "label"].values
-    filtered_table = _table.query("label in @filtered_labels")
-    fig = image_with_contour(
-        img_input_rgb_pil, filtered_labels, filtered_table, active_columns, color_column
-    )
-
-    if cell_index and cell_index["row"] != previous_row:
-        label = filtered_labels[cell_index["row"]]
-        mask = (mask_target == label).astype(np.float)
-        contour = measure.find_contours(mask_target == label, 0.5)[0]
-        # We need to move the contour left and up by one, because
-        # we padded the label array
-        y, x = contour.T - 1
-        # Add the computed contour to the figure as a scatter trace
-        fig.add_scatter(
-            x=x,
-            y=y,
-            mode="lines",
-            showlegend=False,
-            line=dict(color="#3D9970", width=6),
-            hoverinfo="skip",
-            opacity=0.9,
-        )
-        return [fig, cell_index["row"]]
-
-    return [fig, previous_row]
+#
+# @app.callback(
+#     Output("table-line", "style_data_conditional"),
+#     [Input("graph", "hoverData")],
+#     prevent_initial_call=True,
+# )
+# def higlight_row(string):
+#     """
+#     When hovering hover label, highlight corresponding row in table,
+#     using label column.
+#     """
+#     index = string["points"][0]["customdata"]
+#     return [
+#         {
+#             "if": {"filter_query": "{label} eq %d" % index},
+#             "backgroundColor": "#3D9970",
+#             "color": "white",
+#         }
+#     ]
+#
+#
+# @app.callback(
+#     [
+#         Output("graph", "figure"),
+#         Output("row", "children"),
+#     ],
+#     [
+#         Input("table-line", "derived_virtual_indices"),
+#         Input("table-line", "active_cell"),
+#         Input("table-line", "selected_columns"),
+#     ],
+#     [State("color-drop-menu", "value"),
+#      State('json_ch2_gs_rgb', 'data'),
+#      State('json_mask_seed', 'data'),
+#      State('json_mask_target', 'data'),
+#      State('json_table_prop', 'data')
+#      ],
+#     prevent_initial_call=True,
+# )
+# def highlight_filter(
+#     indices, cell_index, active_columns, color_column, previous_row, json_ch2_gs_rgb, json_mask_seed, json_mask_target, json_table_prop):
+#     """
+#     Updates figure and labels array when a selection is made in the table.
+#     When a cell is selected (active_cell), highlight this particular label
+#     with a red outline.
+#     When the set of filtered labels changes, or when a row is deleted.
+#     """
+#     # If no color column is selected, open a popup to ask the user to select one.
+#     ch2_rgb = np.array(json.loads(json_ch2_gs_rgb))
+#     mask_seed = np.array(json.loads(json_mask_seed))
+#     mask_target = np.array(json.loads(json_mask_target))
+#     img = img_as_ubyte(color.gray2rgb(ch2_rgb))
+#     img_input_rgb_pil = Image.fromarray(img)  # 3 channel grayscale no segmentation
+#     mask_target = np.pad(mask_target, (1,), "constant", constant_values=(0,))
+#     table_prop = pd.read_json(json_table_prop, orient='split')
+#     _table = table_prop.iloc[:, [0, 1, 2, 4, 10, 14]]
+#     filtered_labels = _table.loc[indices, "label"].values
+#     filtered_table = _table.query("label in @filtered_labels")
+#     fig = image_with_contour(
+#         img_input_rgb_pil, filtered_labels, filtered_table, active_columns, color_column
+#     )
+#
+#     if cell_index and cell_index["row"] != previous_row:
+#         label = filtered_labels[cell_index["row"]]
+#         mask = (mask_target == label).astype(np.float)
+#         contour = measure.find_contours(mask_target == label, 0.5)[0]
+#         # We need to move the contour left and up by one, because
+#         # we padded the label array
+#         y, x = contour.T - 1
+#         # Add the computed contour to the figure as a scatter trace
+#         fig.add_scatter(
+#             x=x,
+#             y=y,
+#             mode="lines",
+#             showlegend=False,
+#             line=dict(color="#3D9970", width=6),
+#             hoverinfo="skip",
+#             opacity=0.9,
+#         )
+#         return [fig, cell_index["row"]]
+#
+#     return [fig, previous_row]
 
 

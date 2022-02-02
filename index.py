@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "02-02-2021 display compsi is working fro the first time"
+git commit -m "02-02-2021 main app - display image but not sync no table"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
