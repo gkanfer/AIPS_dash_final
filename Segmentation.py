@@ -1,9 +1,3 @@
-"""
-Spyder Editor
-
-This is a temporary script file.
-"""
-
 import dash_daq as daq
 import json
 import dash
@@ -28,6 +22,7 @@ from io import BytesIO
 from flask_caching import Cache
 from dash.long_callback import DiskcacheLongCallbackManager
 import plotly.express as px
+from skimage import io, filters, measure, color, img_as_ubyte
 
 from utils.controls import controls, controls_nuc, controls_cyto
 from utils import AIPS_functions as af
@@ -93,66 +88,63 @@ composite = np.zeros((np.shape(ch2)[0],np.shape(ch2)[1],3),dtype=np.uint8)
 composite[:,:,0] = ch2
 composite[:,:,1] = ch2
 composite[:,:,2] = ch2
+im_pil = Image.fromarray(composite,mode='RGB')
+plt.imshow(im_pil)
 
 bf_mask = dx.binary_frame_mask(ch,nuc_s['sort_mask'])
 bf_mask = np.where(bf_mask == 1, True, False)
-composite[bf_mask > 0,1]=255
+composite[bf_mask > 0,:] = [50,50,50]
 im_pil = Image.fromarray(composite,mode='RGB')
-table_nuc = nuc_s['table']
+plt.imshow(im_pil)
+
+bf_mask = dx.binary_frame_mask(ch,nuc_s['sort_mask'])
+bf_mask = np.where(bf_mask == 1, True, False)
+plt.imshow(nuc_s['sort_mask'])
 
 
+mask = nuc_s['sort_mask']
+bf_mask_sel = np.zeros(np.shape(mask),dtype=np.int32)
+bf_mask_sel[mask==147]=147
+plt.imshow(bf_mask_sel)
+bf_mask = dx.binary_frame_mask(ch,bf_mask_sel)
+bf_mask = np.where(bf_mask == 1, True, False)
+plt.imshow(bf_mask)
+
+from scipy.ndimage.morphology import binary_opening, binary_erosion, binary_dilation
+info_table = pd.DataFrame(
+    measure.regionprops_table(
+        bf_mask_sel,
+        intensity_image=ch,
+        properties=['area', 'label', 'centroid'],
+    )).set_index('label')
+info_table['label'] = range(2, len(info_table) + 2)
+if len(info_table) < 2:
+    seg_mask_eros_9 = binary_erosion(bf_mask_sel, structure=np.ones((9, 9))).astype(np.float64)
+    seg_mask_eros_3 = binary_erosion(bf_mask_sel, structure=np.ones((3, 3))).astype(np.float64)
+    seg_frame = np.where(seg_mask_eros_9 + seg_mask_eros_3 == 2, 3, seg_mask_eros_3)
+    framed_mask = np.where(seg_frame == 3, 0, seg_mask_eros_3)
+    plt.imshow(framed_mask)
 
 
+for i in list(info_table.index.values):
+    seg_mask_temp = np.where(bf_mask_sel == 3, 0,  nuc_s['sort_mask'],)
+    plt.imshow(seg_mask_temp)
+    seg_mask_eros_9 = binary_erosion(seg_mask_temp, structure=np.ones((9, 9))).astype(np.float64)
+    seg_mask_eros_3 = binary_erosion(seg_mask_temp, structure=np.ones((3, 3))).astype(np.float64)
+    seg_frame = np.where(seg_mask_eros_9 + seg_mask_eros_3 == 2, 3, seg_mask_eros_3)
+    framed_mask = np.where(seg_frame == 3, 0, seg_mask_eros_3)
 
-for col in table_nuc.columns:
-    print(col)
-table_nuc['coords']
-np.concatenate(np.array(table_nuc['coords']))
-
-def composite_display(img,label_array, table,):
-    fig = px.imshow(img, binary_string=True, binary_backend="png", )
-    #fig.update_traces(hoverinfo="skip", hovertemplate=None)
-    # for label in label_array:
-    #     x = np.concatenate(np.array(table['coords']))
-    #     y = np.concatenate(np.array(table['coords']))
-    #     hoverinfo = (
-    #             "<br>".join(
-    #                 [
-    #                     # All numbers are passed as floats. If there are no decimals, cast to int for visibility
-    #                     f"{prop_name}: {f'{int(prop_val):d}' if prop_val.is_integer() else f'{prop_val:.3f}'}"
-    #                     if np.issubdtype(type(prop_val), "float")
-    #                     else f"{prop_name}: {prop_val}"
-    #                     for prop_name, prop_val in
-    #                     _columns].iteritems()
-    #                 ]
-    #             )
-    #             # remove the trace name. See e.g. https://plotly.com/python/reference/#scatter-hovertemplate
-    #             + " <extra></extra>"
-    #     )
-    # pass
-
-
-
-
-from skimage import io, filters, measure, color, img_as_ubyte
-
-img = io.imread('/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/Monocyte_no_vacuoles.jpeg', as_gray=True)[:660:2, :800:2]
-label_array = measure.label(img < filters.threshold_otsu(img))
-current_labels = np.unique(label_array)[np.nonzero(np.unique(label_array))]
-img = img_as_ubyte(color.gray2rgb(img))
-img = Image.fromarray(img)
-label_array = np.pad(label_array, (1,), "constant", constant_values=(0,))
-plt.imshow(label_array)
-
-dict = {'x':np.linspace(1,10,10,dtype=np.int),'y':np.linspace(1,10,10,dtype=np.int),'z':np.linspace(1,10,10,dtype=np.int)}
-test = pd.DataFrame(dict)
-test.head()
-test_1 = test.iloc[:,[1,2]]
-test_1.head()
-
-list_column = []
-[list_column.append(str(i)) for i in test.columns]
-prop_names
-
-for col in test.columns:
-    list_column.append(col)
+cseg_mask = seg['cseg_mask']
+bf_mask_sel = np.zeros(np.shape(cseg_mask),dtype=np.int32)
+bf_mask_sel[cseg_mask == 147] = 147
+plt.imshow(bf_mask_sel)
+c_mask = dx.binary_frame_mask_single_point(bf_mask_sel)
+c_mask = np.where(c_mask == 1, True, False)
+plt.imshow(c_mask)
+rgb_input_img = np.zeros((np.shape(ch2)[0], np.shape(ch2)[1], 3), dtype=np.uint8)
+rgb_input_img[:, :, 0] = ch2
+rgb_input_img[:, :, 1] = ch2
+rgb_input_img[c_mask > 0, 2] = 255
+img = img_as_ubyte(color.gray2rgb(rgb_input_img))
+img_input_rgb_pil = Image.fromarray(img)
+plt.imshow(img_input_rgb_pil)

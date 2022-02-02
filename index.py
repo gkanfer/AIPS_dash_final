@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "02-01-2021 table and image display table no functionality"
+git commit -m "02-02-2021 display compsi is working fro the first time"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''

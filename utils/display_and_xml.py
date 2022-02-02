@@ -73,21 +73,24 @@ def display_image_label(ch,mask,lable_draw, font_select,font_size):
         draw.text((info_table.iloc[i, 2].astype('int64'), info_table.iloc[i, 1].astype('int64')),str(info_table.iloc[i, sel_lable]), 'red', font=font)
     return info_table, PIL_image
 
-def binary_frame_mask(ch,mask):
+def binary_frame_mask(ch,mask,table=None):
     '''
-    Create a mask for NIS-elements to photo-activate
+    Create a mask for NIS-elements to photo-activate for multiple point
     :parameter
     ch - input image
     mask - input mask (RGB)
     :return
     framed_mask (RGB)
     '''
-    info_table = pd.DataFrame(
-        measure.regionprops_table(
-            mask,
-            intensity_image=ch,
-            properties=['area', 'label', 'centroid'],
-        )).set_index('label')
+    if table is None:
+        info_table = pd.DataFrame(
+            measure.regionprops_table(
+                mask,
+                intensity_image=ch,
+                properties=['area', 'label', 'centroid'],
+            )).set_index('label')
+    else:
+        info_table=table
     info_table['label'] = range(2, len(info_table) + 2)
     for i in list(info_table.index.values):
         seg_mask_temp = np.where(mask == i, 0, mask)
@@ -96,6 +99,22 @@ def binary_frame_mask(ch,mask):
         seg_frame = np.where(seg_mask_eros_9 + seg_mask_eros_3 == 2, 3, seg_mask_eros_3)
         framed_mask = np.where(seg_frame == 3, 0, seg_mask_eros_3)
     return framed_mask
+
+def binary_frame_mask_single_point(mask,table=None):
+    '''
+    Create a mask for NIS-elements to photo-activate for single point
+    :parameter
+    mask - input mask (RGB)
+    :return
+    framed_mask (RGB)
+    '''
+    seg_mask_eros_9 = binary_erosion(mask, structure=np.ones((9, 9))).astype(np.float64)
+    seg_mask_eros_3 = binary_erosion(mask, structure=np.ones((3, 3))).astype(np.float64)
+    seg_frame = np.where(seg_mask_eros_9 + seg_mask_eros_3 == 2, 3, seg_mask_eros_3)
+    framed_mask = np.where(seg_frame == 3, 0, seg_mask_eros_3)
+    return framed_mask
+
+
 
 
 def Centroid_map(ch, mask, mat):

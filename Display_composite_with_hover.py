@@ -44,10 +44,6 @@ external_stylesheets = [dbc.themes.BOOTSTRAP, "assets/object_properties_style.cs
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 # make image and Mask
-external_stylesheets = [dbc.themes.BOOTSTRAP, "assets/object_properties_style.css"]
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-
-
 path = '/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/'
 #Composite.tif10.tif
 AIPS_object = ai.Segment_over_seed(Image_name='dmsot0273_0003-512.tif', path=path, rmv_object_nuc=0.5, block_size=59,
@@ -413,63 +409,63 @@ def higlight_row(string):
         }
     ]
 
-
-@app.callback(
-    [
-        Output("graph", "figure"),
-        Output("row", "children"),
-        Output("auto-toast", "is_open"),
-    ],
-    [
-        Input("table-line", "derived_virtual_indices"),
-        Input("table-line", "active_cell"),
-        Input("table-line", "data"),
-        Input("table-line", "selected_columns"),
-        Input("color-drop-menu", "value"),
-    ],
-    [State("row", "children")],
-    prevent_initial_call=True,
-)
-def highlight_filter(
-    indices, cell_index, data, active_columns, color_column, previous_row
-):
-    """
-    Updates figure and labels array when a selection is made in the table.
-    When a cell is selected (active_cell), highlight this particular label
-    with a red outline.
-    When the set of filtered labels changes, or when a row is deleted.
-    """
-    # If no color column is selected, open a popup to ask the user to select one.
-    if color_column is None:
-        return [dash.no_update, dash.no_update, True]
-
-    _table = pd.DataFrame(data)
-    filtered_labels = _table.loc[indices, "label"].values
-    filtered_table = _table.query("label in @filtered_labels")
-    fig = image_with_contour(
-        img, filtered_labels, filtered_table, active_columns, color_column
-    )
-
-    if cell_index and cell_index["row"] != previous_row:
-        label = filtered_labels[cell_index["row"]]
-        mask = (label_array == label).astype(np.float)
-        contour = measure.find_contours(label_array == label, 0.5)[0]
-        # We need to move the contour left and up by one, because
-        # we padded the label array
-        y, x = contour.T - 1
-        # Add the computed contour to the figure as a scatter trace
-        fig.add_scatter(
-            x=x,
-            y=y,
-            mode="lines",
-            showlegend=False,
-            line=dict(color="#3D9970", width=6),
-            hoverinfo="skip",
-            opacity=0.9,
-        )
-        return [fig, cell_index["row"], False]
-
-    return [fig, previous_row, False]
+#
+# @app.callback(
+#     [
+#         Output("graph", "figure"),
+#         Output("row", "children"),
+#         Output("auto-toast", "is_open"),
+#     ],
+#     [
+#         Input("table-line", "derived_virtual_indices"),
+#         Input("table-line", "active_cell"),
+#         Input("table-line", "data"),
+#         Input("table-line", "selected_columns"),
+#         Input("color-drop-menu", "value"),
+#     ],
+#     [State("row", "children")],
+#     prevent_initial_call=True,
+# )
+# def highlight_filter(
+#     indices, cell_index, data, active_columns, color_column, previous_row
+# ):
+#     """
+#     Updates figure and labels array when a selection is made in the table.
+#     When a cell is selected (active_cell), highlight this particular label
+#     with a red outline.
+#     When the set of filtered labels changes, or when a row is deleted.
+#     """
+#     # If no color column is selected, open a popup to ask the user to select one.
+#     if color_column is None:
+#         return [dash.no_update, dash.no_update, True]
+#
+#     _table = pd.DataFrame(data)
+#     filtered_labels = _table.loc[indices, "label"].values
+#     filtered_table = _table.query("label in @filtered_labels")
+#     fig = image_with_contour(
+#         img, filtered_labels, filtered_table, active_columns, color_column
+#     )
+#
+#     if cell_index and cell_index["row"] != previous_row:
+#         label = filtered_labels[cell_index["row"]]
+#         mask = (label_array == label).astype(np.float)
+#         contour = measure.find_contours(label_array == label, 0.5)[0]
+#         # We need to move the contour left and up by one, because
+#         # we padded the label array
+#         y, x = contour.T - 1
+#         # Add the computed contour to the figure as a scatter trace
+#         fig.add_scatter(
+#             x=x,
+#             y=y,
+#             mode="lines",
+#             showlegend=False,
+#             line=dict(color="#3D9970", width=6),
+#             hoverinfo="skip",
+#             opacity=0.9,
+#         )
+#         return [fig, cell_index["row"], False]
+#
+#     return [fig, previous_row, False]
 
 
 @app.callback(
