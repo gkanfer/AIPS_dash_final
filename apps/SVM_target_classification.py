@@ -186,7 +186,7 @@ def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_objec
         # select seed counter
         mask_target = np.array(json.loads(json_object_mask_target))
         points = clickData['points']
-        value = mask_target[points[0]['x'],points[0]['y']]
+        value = mask_target[points[0]['y'],points[0]['x']]
         bf_mask_sel = np.zeros(np.shape(mask_target),dtype=np.int32)
         bf_mask_sel[mask_target == value] = value
         c_mask = dx.binary_frame_mask_single_point(bf_mask_sel)
