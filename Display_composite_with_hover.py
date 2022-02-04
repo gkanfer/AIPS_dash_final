@@ -493,3 +493,41 @@ def toggle_navbar_collapse(n, is_open):
 
 if __name__ == "__main__":
     app.run_server(debug=False)
+
+
+
+import dash
+from dash.dependencies import Input, Output, State
+import dash_core_components as dcc
+import dash_html_components as html
+import dash_bootstrap_components as dbc
+from dash import callback_context
+import dash_table
+import pandas as pd
+from collections import OrderedDict
+import dash_daq as daq
+
+app = dash.Dash(__name__)
+
+app.layout = dbc.Row([
+    dbc.Button('Target', id='target', color="success", className="me-1", n_clicks=0,active=True,style={'font-weight': 'normal'}, size='normal'),
+    dbc.Button('Control', id='control', color="danger", className="me-1", n_clicks=0,active=True,style={'font-weight': 'bold'}, size='lg'),])
+
+#
+# @app.callback(
+#     [Output('target', 'style'),
+#      Output('control', 'style')],
+#     [Input('target', 'n_clicks'),
+#     Input('control', 'n_clicks')])
+# def displayClick(targt_btn, ctrl_btn):
+#     if targt_btn and ctrl_btn is None:
+#         return dash.no_update, dash.no_update
+#     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+#     if 'target' in changed_id:
+#         return [{'font-weight': 'bold'},{'font-weight': 'normal'}]
+#     else:
+#         return [{'font-weight': 'normal'},{'font-weight': 'bold'}]
+
+if __name__ == '__main__':
+    app.run_server()
+

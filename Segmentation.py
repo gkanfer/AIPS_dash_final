@@ -93,7 +93,7 @@ table = pd.DataFrame(prop_table)
 columns = [
     {"name": label_name, "id": label_name,"type": "numeric", "selectable": True}
     for label_name in table.columns]
-
+df = table
 
 # Format the Table columns
 # columns = [
@@ -108,8 +108,8 @@ columns = [
 #     for label_name, precision in zip(prop_names, (None, None, 4, 4, None, 3))]
 columns = [{"name": i, "id": i} for i in table.columns]
 initial_columns = ["label", "area"]
+x=1
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-
 app.layout = dash_table.DataTable(
                                     id="table-line",
                                     columns=columns,
@@ -127,7 +127,14 @@ app.layout = dash_table.DataTable(
                                     filter_action="native",
                                     row_deletable=True,
                                     column_selectable="multi",
-                                    # selected_columns=initial_columns,
+                                    # selected_columns=initial_columns,df.loc[df['label']==1,['label']]
+                                    style_data_conditional=[
+                                            {
+                                                 'if': {'filter_query': '{{label}} = {}'.format(x)},
+                                                    'backgroundColor': '#85144b',
+                                                    'color': 'white'
+                                            }
+                                        ],
                                     style_table={"overflowY": "scroll"},
                                     fixed_rows={"headers": False, "data": 0},
                                     style_cell={"width": "85px"},
@@ -136,3 +143,9 @@ app.layout = dash_table.DataTable(
 
 if __name__ == '__main__':
     app.run_server()
+
+
+
+from dash import Dash, html, Input, Output, callback_context
+
+app = Dash(__name__)

@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "02-02-2021 main app - display image sync table sync no color"
+git commit -m "04-02-2021 main app - display image sync table sync color works"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''

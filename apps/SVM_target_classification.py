@@ -2,6 +2,7 @@
 import dash_daq as daq
 import json
 import dash
+from dash import callback_context
 import dash.exceptions
 import dash_core_components as dcc
 import dash_html_components as html
@@ -55,6 +56,11 @@ layout = html.Div(
                             dcc.Tab(label="Model generation", id = "Model-generation-id", value="Model-generation-val",style={'color': 'black'},selected_style={'color': 'red'},disabled=True),
                             dcc.Tab(label="Model test", id = "Model-test-id", value="Model-test-val",style={'color': 'black'},selected_style={'color': 'red'},disabled=True),
                     ]),
+            dbc.Button('Target', id='target', color="success", className="me-1", n_clicks=0, active=True,
+                       style={'font-weight': 'normal'}, size='lg'),
+            dbc.Button('Control', id='control', color="danger", className="me-1", n_clicks=0, active=True,
+                       style={'font-weight': 'bold'}, size='sm'),
+            html.Div(id='json_label_state'),
             html.Div(id='Tab_image_display'),
             html.Div(id='dump',hidden=True),
             dcc.Store(id='jason_ch2'),
@@ -216,38 +222,46 @@ def display_image(json_img,json_ch2_gs_rgb):
         fig = px.imshow(img_input_rgb_pil, binary_string=True, binary_backend="jpg", )
         return dcc.Graph(id="graph",figure=fig)
 
-#
-# @app.callback([Output('table-line', 'columns'),
-#                Output('table-line', 'data')],
-#                 Input('json_table_prop', 'data'))
-# def load_image_and_table(table_prop):
-#     dict = {'x':[1,2],'y':[2,3]}
-#     table = pd.DataFrame(dict)
-#     columns = [{"name": i, "id": i} for i in table.columns],
-#     data = table.to_dict("rows")
-#     return columns, data
+# Selected label
 
+@app.callback(
+    [Output('target', 'style'),
+     Output('control', 'style'),
+    Output('target', 'size'),
+     Output('control', 'size'),
+     Output('json_label_state','data')],
+    [Input('target', 'n_clicks'),
+    Input('control', 'n_clicks')])
+def displayClick(targt_btn, ctrl_btn):
+    if targt_btn and ctrl_btn is None:
+        return dash.no_update, dash.no_update, dash.no_update,dash.no_update,dash.no_update
+    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+    jason_label = json.dumps([changed_id])
+    if 'target' in changed_id:
+        return {'font-weight': 'bold'},{'font-weight': 'normal'},"lg","sm",jason_label
+    else:
+        return {'font-weight': 'normal'},{'font-weight': 'bold'},"sm","lg",jason_label
 
-#
 @app.callback(Output('Tab_table_display', 'children'),
-            Input('json_table_prop', 'data'))
-def load_image_and_table(table_prop):
-     table = pd.read_json(table_prop,orient='split')
-     #table = table.iloc[:,0:5]
-     table['id'] = table.index
-     return  [dbc.Card([
-             dbc.CardBody(
-                 dbc.Row(
-                     dbc.Col(
-                         [
+            [Input('json_table_prop', 'data'),
+            Input('json_selected_roi','data'),
+            Input('json_label_state', 'data')])
+def load_image_and_table(table_prop,roi,label_color):
+    table = pd.read_json(table_prop,orient='split')
+    if roi is None or label_color is None:
+        return  [dbc.Card([
+                 dbc.CardBody(
+                     dbc.Row(
+                         dbc.Col(
+                             [
                              dash_table.DataTable(
                                  id="table-line",
-                                 # columns=columns,
+                                 columns=columns,
                                  data=table.to_dict("records"),
-                                 columns= [{"name": i, "id": i}
-                                           for i in table.columns],
-                                 # columns = [{"name": label_name, "id": label_name,"type": "numeric", "selectable": True}
-                                 #            for label_name in table.columns],
+                                 style_header={
+                                     "textDecoration": "underline",
+                                     "textDecorationStyle": "dotted",
+                                 },
                                  tooltip_delay=0,
                                  tooltip_duration=None,
                                  filter_action="native",
@@ -256,223 +270,136 @@ def load_image_and_table(table_prop):
                                  style_table={"overflowX": "scroll"},
                                  fixed_rows={"headers": False, "data": 0},
                                  style_cell={"width": "85px"},
-                                 row_selectable="multi",
-                                 style_data_conditional={"filter_query":'0',"backgroundColor": "yellow",},
                                  page_size=10,
                              ),
                          ]
                      )
                  )),
                  ])]
+    else:
+        roi = json.loads(roi)
+        x = table.loc[table['label']==int(roi),'label']
+        label_color_sel = json.loads(label_color)
+        if 'target' in label_color_sel[0]:
+            color = '#1ABA19'
+        else:
+            color = '#F31515'
+        return  [dbc.Card([
+                         dbc.CardBody(
+                             dbc.Row(
+                                 dbc.Col(
+                                     [
+                                         dash_table.DataTable(
+                                             id="table-line",
+                                             # columns=columns,
+                                             data=table.to_dict("records"),
+                                             columns= [{"name": i, "id": i}
+                                                       for i in table.columns],
+                                             style_data_conditional=[
+                                                 {
+                                                     'if': {'filter_query': '{{label}} = {}'.format(int(x))},
+                                                     'backgroundColor': '{}'.format(color),
+                                                     'color': 'white'
+                                                 }
+                                             ],
+                                             tooltip_delay=0,
+                                             tooltip_duration=None,
+                                             filter_action="native",
+                                             row_deletable=True,
+                                             column_selectable="multi",
+                                             style_table={"overflowX": "scroll"},
+                                             fixed_rows={"headers": False, "data": 0},
+                                             style_cell={"width": "85px"},
+                                             row_selectable="multi",
+                                             page_size=10,
+                                         ),
+                                     ]
+                                 )
+                             )),
+                             ])]
+
+
+
+
 
 #
-# @app.callback(
-#     Output("table-line", "style_data_conditional"),
-#     [Input("table-line", "derived_viewport_selected_row_ids"),
-#     Input('json_selected_roi', 'data'),])
-# def style_selected_rows(selRows,roi):
-#     if selRows is None:
-#         return dash.no_update
+# @app.callback(Output('Tab_table_display', 'children'),
+#             [Input('json_table_prop', 'data'),
+#             Input('json_selected_roi','data'),
+#             Input('json_label_state', 'data')])
+# def load_image_and_table(table_prop,roi,label_color):
+#     table = pd.read_json(table_prop,orient='split')
+#     if roi is None or label_color is None:
+#          return  [dbc.Card([
+#                  dbc.CardBody(
+#                      dbc.Row(
+#                          dbc.Col(
+#                              [
+#                                  dash_table.DataTable(
+#                                      id="table-line",
+#                                      # columns=columns,
+#                                      data=table.to_dict("records"),
+#                                      columns= [{"name": i, "id": i}
+#                                                for i in table.columns],
+#                                      tooltip_delay=0,
+#                                      tooltip_duration=None,
+#                                      filter_action="native",
+#                                      row_deletable=True,
+#                                      column_selectable="multi",
+#                                      style_table={"overflowX": "scroll"},
+#                                      fixed_rows={"headers": False, "data": 0},
+#                                      style_cell={"width": "85px"},
+#                                      row_selectable="multi",
+#                                      style_data_conditional={"filter_query":'0',"backgroundColor": "yellow",},
+#                                      page_size=10,
+#                                  ),
+#                              ]
+#                          )
+#                      )),
+#                      ])]
 #     else:
-#         roi = json.loads(roi.tolist())
-#         return [
-#             {"if": {"filter_query": "{{id}} ={}".format(i)}, "backgroundColor": "yellow",}
-#             for i in selRows
-#         ]
-
-
-
-
-#
-# @app.callback(
-#     Output("table-line", "style_data_conditional"),
-#     [Input("table-line", "derived_viewport_selected_row_ids"),
-#     Input('json_selected_roi', 'data'),])
-# def style_selected_rows(selRows,roi):
-#     if selRows is None:
-#         return dash.no_update
-#     else:
-#         roi = json.loads(roi.tolist())
-#         return [
-#             {"if": {"filter_query": "{{id}} ={}".format(i)}, "backgroundColor": "yellow",}
-#             for i in selRows
-#         ]
-
-
-
-# @app.callback(
-#             [Output('Tab_image_display', 'children'),
-#              Output('Tab_table_display', 'children')],
-#             [Input('jason_ch2', 'data'),
-#             Input('json_ch2_gs_rgb', 'data'),
-#             Input('json_mask_seed', 'data'),
-#             Input('json_mask_target', 'data'),
-#             Input('json_table_prop', 'data')])
-# def load_image_and_table(_ch2_jason,json_object_ch2_gs_rgb,json_object_mask_seed,json_object_mask_target, json_object_table_prop):
-#     ch2_rgb = np.array(json.loads(json_object_ch2_gs_rgb))
-#     mask_seed = np.array(json.loads(json_object_mask_seed))
-#     mask_target = np.array(json.loads(json_object_mask_target))
-#     table_prop = pd.read_json(json_object_table_prop,orient='split')
-#     table = table_prop.iloc[:,[0,1,2,4,10,14]]
-#     prop_names = []
-#     [prop_names.append(str(i)) for i in table.columns]
-#     columns = [
-#         {"name": label_name, "id": label_name, "selectable": True}
-#         if precision is None
-#         else {
-#             "name": label_name,
-#             "id": label_name,
-#             "type": "numeric",
-#             "selectable": True,
-#         }
-#         for label_name, precision in zip(prop_names, (None, None, None, None, None, None))]
-#     initial_columns = ["label", "area"]
-#     # create a rgb pil images
-#     img = img_as_ubyte(color.gray2rgb(ch2_rgb))
-#     img_input_rgb_pil = Image.fromarray(img)  # 3 channel grayscale no segmentation
-#     mask_target = np.pad(mask_target, (1,), "constant", constant_values=(0,))
-#     return [dbc.Card([
-#             dbc.CardHeader(html.H2("Explore seed properties - SVM", style={'text-align': 'center'})),
-#             dbc.CardBody(
-#                 dbc.Row(
-#                     dbc.Col(
-#                         dcc.Graph(
-#                             id="graph",
-#                             figure=image_with_contour(
-#                                 img_input_rgb_pil,
-#                                 mask_target,
-#                                 table,
-#                                 initial_columns,
-#                                 color_column="area",
-#                             ),
-#                         ),
-#                     )
-#                 )
-#             ),
-#             dcc.Dropdown(
-#                 id="color-drop-menu",
-#                 options=[
-#                     {"label": col_name.capitalize(), "value": col_name}
-#                     for col_name in table.columns
-#                 ],
-#                 value="label",
-#             ),]),
-#         dbc.Card([
-#         dbc.CardBody(
-#             dbc.Row(
-#                 dbc.Col(
-#                     [
-#                         dash_table.DataTable(
-#                             id="table-line",
-#                             columns=columns,
-#                             data=table.to_dict("records"),
-#                             tooltip_header={
-#                                 col: "Select columns with the checkbox to include them in the hover info of the image."
-#                                 for col in table.columns
-#                             },
-#                             style_header={
-#                                 "textDecoration": "underline",
-#                                 "textDecorationStyle": "dotted",
-#                             },
-#                             tooltip_delay=0,
-#                             tooltip_duration=None,
-#                             filter_action="native",
-#                             row_deletable=True,
-#                             column_selectable="multi",
-#                             selected_columns=initial_columns,
-#                             style_table={"overflowY": "scroll"},
-#                             fixed_rows={"headers": False, "data": 0},
-#                             style_cell={"width": "85px"},
-#                             page_size=10,
-#                         ),
-#                         html.Div(id="row", hidden=True, children=None),
-#                     ]
-#                 )
-#             )),
-#             ]) ]
+#         roi = json.loads(roi)
+#         x = table.loc[table['label']==int(roi),'label']
+#         label_color_sel = json.loads(label_color)
+#         if 'target' in label_color_sel:
+#             color = '#1ABA19'
+#         else:
+#             color = '#F31515'
+#         return  [dbc.Card([
+#                          dbc.CardBody(
+#                              dbc.Row(
+#                                  dbc.Col(
+#                                      [
+#                                          dash_table.DataTable(
+#                                              id="table-line",
+#                                              # columns=columns,
+#                                              data=table.to_dict("records"),
+#                                              columns= [{"name": i, "id": i}
+#                                                        for i in table.columns],
+#                                              style_data_conditional=[
+#                                                  {
+#                                                      'if': {'filter_query': '{{label}} = {}'.format(int(x))},
+#                                                      'backgroundColor': '{}'.format(color),
+#                                                      'color': 'white'
+#                                                  }
+#                                              ],
+#                                              tooltip_delay=0,
+#                                              tooltip_duration=None,
+#                                              filter_action="native",
+#                                              row_deletable=True,
+#                                              column_selectable="multi",
+#                                              style_table={"overflowX": "scroll"},
+#                                              fixed_rows={"headers": False, "data": 0},
+#                                              style_cell={"width": "85px"},
+#                                              row_selectable="multi",
+#                                              page_size=10,
+#                                          ),
+#                                      ]
+#                                  )
+#                              )),
+#                              ])]
 #
 
-#
-# @app.callback(
-#     Output("table-line", "style_data_conditional"),
-#     [Input("graph", "hoverData")],
-#     prevent_initial_call=True,
-# )
-# def higlight_row(string):
-#     """
-#     When hovering hover label, highlight corresponding row in table,
-#     using label column.
-#     """
-#     index = string["points"][0]["customdata"]
-#     return [
-#         {
-#             "if": {"filter_query": "{label} eq %d" % index},
-#             "backgroundColor": "#3D9970",
-#             "color": "white",
-#         }
-#     ]
-#
-#
-# @app.callback(
-#     [
-#         Output("graph", "figure"),
-#         Output("row", "children"),
-#     ],
-#     [
-#         Input("table-line", "derived_virtual_indices"),
-#         Input("table-line", "active_cell"),
-#         Input("table-line", "selected_columns"),
-#     ],
-#     [State("color-drop-menu", "value"),
-#      State('json_ch2_gs_rgb', 'data'),
-#      State('json_mask_seed', 'data'),
-#      State('json_mask_target', 'data'),
-#      State('json_table_prop', 'data')
-#      ],
-#     prevent_initial_call=True,
-# )
-# def highlight_filter(
-#     indices, cell_index, active_columns, color_column, previous_row, json_ch2_gs_rgb, json_mask_seed, json_mask_target, json_table_prop):
-#     """
-#     Updates figure and labels array when a selection is made in the table.
-#     When a cell is selected (active_cell), highlight this particular label
-#     with a red outline.
-#     When the set of filtered labels changes, or when a row is deleted.
-#     """
-#     # If no color column is selected, open a popup to ask the user to select one.
-#     ch2_rgb = np.array(json.loads(json_ch2_gs_rgb))
-#     mask_seed = np.array(json.loads(json_mask_seed))
-#     mask_target = np.array(json.loads(json_mask_target))
-#     img = img_as_ubyte(color.gray2rgb(ch2_rgb))
-#     img_input_rgb_pil = Image.fromarray(img)  # 3 channel grayscale no segmentation
-#     mask_target = np.pad(mask_target, (1,), "constant", constant_values=(0,))
-#     table_prop = pd.read_json(json_table_prop, orient='split')
-#     _table = table_prop.iloc[:, [0, 1, 2, 4, 10, 14]]
-#     filtered_labels = _table.loc[indices, "label"].values
-#     filtered_table = _table.query("label in @filtered_labels")
-#     fig = image_with_contour(
-#         img_input_rgb_pil, filtered_labels, filtered_table, active_columns, color_column
-#     )
-#
-#     if cell_index and cell_index["row"] != previous_row:
-#         label = filtered_labels[cell_index["row"]]
-#         mask = (mask_target == label).astype(np.float)
-#         contour = measure.find_contours(mask_target == label, 0.5)[0]
-#         # We need to move the contour left and up by one, because
-#         # we padded the label array
-#         y, x = contour.T - 1
-#         # Add the computed contour to the figure as a scatter trace
-#         fig.add_scatter(
-#             x=x,
-#             y=y,
-#             mode="lines",
-#             showlegend=False,
-#             line=dict(color="#3D9970", width=6),
-#             hoverinfo="skip",
-#             opacity=0.9,
-#         )
-#         return [fig, cell_index["row"]]
-#
-#     return [fig, previous_row]
+
 
 
