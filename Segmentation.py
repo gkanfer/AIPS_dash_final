@@ -108,7 +108,14 @@ df = table
 #     for label_name, precision in zip(prop_names, (None, None, 4, 4, None, 3))]
 columns = [{"name": i, "id": i} for i in table.columns]
 initial_columns = ["label", "area"]
-x=1
+x=[1]
+z = [
+    {
+         'if': {'filter_query': '{{label}} = {}'.format(i)},
+            'backgroundColor': '#85144b',
+            'color': 'white'
+    } for i in x
+    ]
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.layout = dash_table.DataTable(
                                     id="table-line",
@@ -128,13 +135,14 @@ app.layout = dash_table.DataTable(
                                     row_deletable=True,
                                     column_selectable="multi",
                                     # selected_columns=initial_columns,df.loc[df['label']==1,['label']]
-                                    style_data_conditional=[
-                                            {
-                                                 'if': {'filter_query': '{{label}} = {}'.format(x)},
-                                                    'backgroundColor': '#85144b',
-                                                    'color': 'white'
-                                            }
-                                        ],
+                                    # style_data_conditional=[
+                                    #         {
+                                    #              'if': {'filter_query': '{{label}} = {}'.format(i)},
+                                    #                 'backgroundColor': '#85144b',
+                                    #                 'color': 'white'
+                                    #         } for i in x
+                                    #     ],
+                                    style_data_conditional = z,
                                     style_table={"overflowY": "scroll"},
                                     fixed_rows={"headers": False, "data": 0},
                                     style_cell={"width": "85px"},

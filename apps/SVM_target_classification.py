@@ -70,17 +70,40 @@ layout = html.Div(
             dcc.Store(id='json_table_prop'),
             dcc.Store(id='json_img'),
             dcc.Store(id = 'json_selected_roi'),
+            dcc.Store(id = 'json_update_prop_table_temp'),
+            dcc.Store(id = 'json_roi_temp'),
+            dcc.Store(id = 'json_update_prop_table'),
             ])
     ])
 
-#
+
+# Selected label
+@app.callback(
+    [Output('target', 'style'),
+     Output('control', 'style'),
+     Output('target', 'size'),
+     Output('control', 'size'),
+     Output('json_label_state','data')],
+    [Input('target', 'n_clicks'),
+    Input('control', 'n_clicks')])
+def displayClick(targt_btn, ctrl_btn):
+    if targt_btn and ctrl_btn is None:
+        return dash.no_update, dash.no_update, dash.no_update,dash.no_update,dash.no_update
+    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+    jason_label = json.dumps([changed_id])
+    if 'target' in changed_id:
+        return {'font-weight': 'bold'},{'font-weight': 'normal'},"lg","sm",jason_label
+    else:
+        return {'font-weight': 'normal'},{'font-weight': 'bold'},"sm","lg",jason_label
+
 # # # # loading all the data
 @app.callback([
     Output('jason_ch2', 'data'),
     Output('json_ch2_gs_rgb', 'data'),
     Output('json_mask_seed','data'),
     Output('json_mask_target','data'),
-    Output('json_table_prop','data')],
+    Output('json_table_prop','data')
+                                    ],
    [Input('upload-image', 'filename'),
     State('act_ch', 'value'),
     State('block_size','value'),
@@ -139,7 +162,7 @@ def Generate_segmentation_and_table(image,channel,bs,os,osd,ron,bsc,osc,oscd,gt,
     rgb_input_img[:, :, 0] = ch2_u8
     rgb_input_img[:, :, 1] = ch2_u8
     rgb_input_img[:, :, 2] = ch2_u8
-    rgb_input_img[bf_mask > 0, 1] = 255 # 3d grayscale array where green channel is for seed segmentation
+    rgb_input_img[bf_mask > 0, 2] = 255 # 3d grayscale array where green channel is for seed segmentation
     cseg_mask = seg['cseg_mask']
     #label_array = nuc_s['sort_mask']
     prop_names = [
@@ -177,17 +200,24 @@ def Generate_segmentation_and_table(image,channel,bs,os,osd,ron,bsc,osc,oscd,gt,
 @app.callback(
     [Output("dump", "children"),
      Output('json_img','data'),
-     Output('json_selected_roi','data')],
-    [Input("graph","clickData"),
+     Output('json_selected_roi','data'),
+     Output('json_update_prop_table_temp', 'data')],
+    [Input('graph','clickData'),
     Input('jason_ch2', 'data'),
     Input('json_ch2_gs_rgb', 'data'),
     Input('json_mask_seed', 'data'),
-    Input('json_mask_target', 'data')])
-    # Input('json_table_prop', 'data')])
-def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_object_mask_seed,json_object_mask_target):
+    Input('json_mask_target', 'data'),
+     Input('json_label_state','data'),
+     Input('json_table_prop', 'data')])
+def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_object_mask_seed,json_object_mask_target,label_color,table_prop):
     if clickData is None:
-        return dash.no_update,dash.no_update,dash.no_update
+        return dash.no_update,dash.no_update,dash.no_update,dash.no_update
     else:
+        label_color_sel = json.loads(label_color)
+        if 'target' in label_color_sel[0]:
+            color = 1
+        else:
+            color = 0
         #load 3d np array with seed segmentation
         ch2_rgb = np.array(json.loads(json_object_ch2_gs_rgb))
         # select seed counter
@@ -198,11 +228,23 @@ def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_objec
         bf_mask_sel[mask_target == value] = value
         c_mask = dx.binary_frame_mask_single_point(bf_mask_sel)
         c_mask = np.where(c_mask == 1, True, False)
-        ch2_rgb[c_mask > 0, 2] = 255
+        if 'target' in label_color_sel[0]:
+            ch2_rgb[c_mask > 0, 1] = 255
+        else:
+            ch2_rgb[c_mask > 0, 0] = 255
         json_object_fig_updata = json.dumps(ch2_rgb.tolist())
         roi_sel = json.dumps(value.tolist())
-        return json.dumps(clickData, indent=2),json_object_fig_updata,roi_sel
+        table = pd.read_json(table_prop, orient='split')
+        table['roi_ctrl']=0
+        table['roi_trgt']=0
+        if 'target' in label_color_sel[0]:
+            table.loc[table['label'] == int(value), 'roi_trgt'] = value
+        else:
+            table.loc[table['label'] == int(value), 'roi_ctrl'] = value
+        json_table_temp = pd.DataFrame(table).to_json(orient='split')
+        return json.dumps(clickData, indent=2),json_object_fig_updata,roi_sel, json_table_temp
 
+#display_mask
 @app.callback(
             Output('Tab_image_display', 'children'),
             [Input('json_img','data'),
@@ -222,25 +264,42 @@ def display_image(json_img,json_ch2_gs_rgb):
         fig = px.imshow(img_input_rgb_pil, binary_string=True, binary_backend="jpg", )
         return dcc.Graph(id="graph",figure=fig)
 
-# Selected label
+#update table
+@app.callback(Output('json_update_prop_table', 'data'),
+              [Input('json_roi_temp', 'data'),
+              Input('json_update_prop_table_temp', 'data'),
+              Input('json_label_state', 'data')])
+def update_table(roi_temp,table_temp,label_state):
+    if table_temp is None:
+        return dash.no_update
+    elif roi_temp is None:
+        table_temp = pd.read_json(table_temp, orient='split')
+        table_temp_json = pd.DataFrame(table_temp).to_json(orient='split')
+        return table_temp_json
+    else: # update table
+        if 'target' in label_state[0]:
+            column = 'roi_trgt'
+        else:
+            column = 'roi_ctrl'
+        table_temp = pd.read_json(table_temp, orient='split')
+        roi = json.loads(roi_temp)
+        if roi not in table_temp.loc[:, column]:
+            table_temp.loc[table_temp['label']==roi,column] = roi
+        table_temp_json = pd.DataFrame(table_temp).to_json(orient='split')
+        return table_temp_json
 
-@app.callback(
-    [Output('target', 'style'),
-     Output('control', 'style'),
-    Output('target', 'size'),
-     Output('control', 'size'),
-     Output('json_label_state','data')],
-    [Input('target', 'n_clicks'),
-    Input('control', 'n_clicks')])
-def displayClick(targt_btn, ctrl_btn):
-    if targt_btn and ctrl_btn is None:
-        return dash.no_update, dash.no_update, dash.no_update,dash.no_update,dash.no_update
-    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
-    jason_label = json.dumps([changed_id])
-    if 'target' in changed_id:
-        return {'font-weight': 'bold'},{'font-weight': 'normal'},"lg","sm",jason_label
+# store previous roi in json
+@app.callback(Output('json_roi_temp', 'data'),
+              [Input('json_update_prop_table','data'),
+              State('json_selected_roi', 'data')])
+def update_roi_list(_,roi):
+    table_temp = pd.read_json(_, orient='split')
+    roi = json.loads(roi)
+    if roi is None:
+        return dash.no_update
     else:
-        return {'font-weight': 'normal'},{'font-weight': 'bold'},"sm","lg",jason_label
+        roi_sel = json.dumps(roi) #update next roi
+        return roi_sel
 
 @app.callback(Output('Tab_table_display', 'children'),
             [Input('json_table_prop', 'data'),
@@ -256,7 +315,7 @@ def load_image_and_table(table_prop,roi,label_color):
                              [
                              dash_table.DataTable(
                                  id="table-line",
-                                 columns=columns,
+                                 columns=[{"name": i, "id": i} for i in table.columns],
                                  data=table.to_dict("records"),
                                  style_header={
                                      "textDecoration": "underline",
@@ -311,6 +370,7 @@ def load_image_and_table(table_prop,roi,label_color):
                                              fixed_rows={"headers": False, "data": 0},
                                              style_cell={"width": "85px"},
                                              row_selectable="multi",
+                                             persistence=True,
                                              page_size=10,
                                          ),
                                      ]
@@ -322,83 +382,6 @@ def load_image_and_table(table_prop,roi,label_color):
 
 
 
-#
-# @app.callback(Output('Tab_table_display', 'children'),
-#             [Input('json_table_prop', 'data'),
-#             Input('json_selected_roi','data'),
-#             Input('json_label_state', 'data')])
-# def load_image_and_table(table_prop,roi,label_color):
-#     table = pd.read_json(table_prop,orient='split')
-#     if roi is None or label_color is None:
-#          return  [dbc.Card([
-#                  dbc.CardBody(
-#                      dbc.Row(
-#                          dbc.Col(
-#                              [
-#                                  dash_table.DataTable(
-#                                      id="table-line",
-#                                      # columns=columns,
-#                                      data=table.to_dict("records"),
-#                                      columns= [{"name": i, "id": i}
-#                                                for i in table.columns],
-#                                      tooltip_delay=0,
-#                                      tooltip_duration=None,
-#                                      filter_action="native",
-#                                      row_deletable=True,
-#                                      column_selectable="multi",
-#                                      style_table={"overflowX": "scroll"},
-#                                      fixed_rows={"headers": False, "data": 0},
-#                                      style_cell={"width": "85px"},
-#                                      row_selectable="multi",
-#                                      style_data_conditional={"filter_query":'0',"backgroundColor": "yellow",},
-#                                      page_size=10,
-#                                  ),
-#                              ]
-#                          )
-#                      )),
-#                      ])]
-#     else:
-#         roi = json.loads(roi)
-#         x = table.loc[table['label']==int(roi),'label']
-#         label_color_sel = json.loads(label_color)
-#         if 'target' in label_color_sel:
-#             color = '#1ABA19'
-#         else:
-#             color = '#F31515'
-#         return  [dbc.Card([
-#                          dbc.CardBody(
-#                              dbc.Row(
-#                                  dbc.Col(
-#                                      [
-#                                          dash_table.DataTable(
-#                                              id="table-line",
-#                                              # columns=columns,
-#                                              data=table.to_dict("records"),
-#                                              columns= [{"name": i, "id": i}
-#                                                        for i in table.columns],
-#                                              style_data_conditional=[
-#                                                  {
-#                                                      'if': {'filter_query': '{{label}} = {}'.format(int(x))},
-#                                                      'backgroundColor': '{}'.format(color),
-#                                                      'color': 'white'
-#                                                  }
-#                                              ],
-#                                              tooltip_delay=0,
-#                                              tooltip_duration=None,
-#                                              filter_action="native",
-#                                              row_deletable=True,
-#                                              column_selectable="multi",
-#                                              style_table={"overflowX": "scroll"},
-#                                              fixed_rows={"headers": False, "data": 0},
-#                                              style_cell={"width": "85px"},
-#                                              row_selectable="multi",
-#                                              page_size=10,
-#                                          ),
-#                                      ]
-#                                  )
-#                              )),
-#                              ])]
-#
 
 
 
