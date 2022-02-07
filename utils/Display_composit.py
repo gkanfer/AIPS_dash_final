@@ -141,3 +141,24 @@ def image_with_contour(img, active_labels, data_table, active_columns, color_col
         visible=False, range=[img.height, 0]
     )
     return fig
+#https://dash.plotly.com/datatable/conditional-formatting
+def row_highlight(roi_list_ctrl,cl_ctrl='#F31515',roi_list_target,cl_target='#1ABA19'):
+    return  ([
+                 {'if': {'filter_query': '{{label}} = {}'.format(int(roi_ctrl))},
+                     'backgroundColor': '{}'.format(cl_ctrl),
+                     'color': 'white'
+                 }
+                for roi_ctrl in roi_list_ctrl
+                ] +
+                [
+                 {
+                     'if':
+                         {'filter_query': '{{label}} = {}'.format(int(roi_))},
+                        'backgroundColor': '{}'.format(cl_target),
+                        'color': 'white'
+                 }
+                for roi_ in roi_list_target
+            ])
+
+
+
