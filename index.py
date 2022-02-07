@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "06-02-2022 main app - display image sync table sync color works store problem"
+git commit -m "07-02-2022 main app - segmentation example - self updating roi "
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''

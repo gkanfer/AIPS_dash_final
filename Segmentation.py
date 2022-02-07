@@ -47,113 +47,93 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 # make image and Mask
 path = '/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/'
 #Composite.tif10.tif
-AIPS_object = ai.Segment_over_seed(Image_name='dmsot0273_0003-512.tif', path=path, rmv_object_nuc=0.5, block_size=59,
-                                           offset=-0.0004,block_size_cyto=59, offset_cyto=-0.0004, global_ther=0.2, rmv_object_cyto=0.1,
-                                           rmv_object_cyto_small=0.1, remove_border=False)
+AIPS_object = ai.Segment_over_seed(Image_name='dmsot0273_0003-512.tif', path=path, rmv_object_nuc=0.5, block_size=83,
+                                           offset=0.00001,block_size_cyto=11, offset_cyto=-0.0003, global_ther=0.4, rmv_object_cyto=0.99,
+                                           rmv_object_cyto_small=0.2, remove_border=False)
 
 img = AIPS_object.load_image()
 nuc_s = AIPS_object.Nucleus_segmentation(img['1'], inv=False)
-
 ch = img['1']
 ch2 = img['0']
+seg = AIPS_object.Cytosol_segmentation(ch, ch2, nuc_s['sort_mask'], nuc_s['sort_mask_bin'])
+#plt.imshow(seg['cseg_mask'])
 #ch2 = ch2*2**16
 ch2 = (ch2/ch2.max())*255
 ch2 = np.uint8(ch2)
 composite = np.zeros((np.shape(ch2)[0],np.shape(ch2)[1],3),dtype=np.uint8)
+bf_mask = dx.binary_frame_mask(ch2, seg['sort_mask_sync'])
+bf_mask = np.where(bf_mask == 1, True, False)
+c_mask = dx.binary_frame_mask(ch2, seg['cseg_mask'])
+c_mask = np.where(c_mask == 1, True, False)
 composite[:,:,0] = ch2
 composite[:,:,1] = ch2
 composite[:,:,2] = ch2
-img = composite
-# mask
-label_array = nuc_s['sort_mask']
-current_labels = np.unique(label_array)[np.nonzero(np.unique(label_array))]
-prop_names = [
-    "label",
-    "area",
-    "eccentricity",
-    "euler_number",
-    "extent",
-    "feret_diameter_max",
-    "inertia_tensor",
-    "inertia_tensor_eigvals",
-    "moments",
-    "moments_central",
-    "moments_hu",
-    "moments_normalized",
-    "orientation",
-    "perimeter",
-    "perimeter_crofton",
-    # "slice",
-    "solidity"
-]
-prop_table = measure.regionprops_table(
-    label_array, intensity_image=img, properties=prop_names
-)
-table = pd.DataFrame(prop_table)
-columns = [
-    {"name": label_name, "id": label_name,"type": "numeric", "selectable": True}
-    for label_name in table.columns]
-df = table
-
-# Format the Table columns
-# columns = [
-#     {"name": label_name, "id": label_name, "selectable": True}
-#     if precision is None
-#     else {
-#         "name": label_name,
-#         "id": label_name,
-#         "type": "numeric",
-#         "selectable": True,
-#     }
-#     for label_name, precision in zip(prop_names, (None, None, 4, 4, None, 3))]
-columns = [{"name": i, "id": i} for i in table.columns]
-initial_columns = ["label", "area"]
-x=[1]
-z = [
-    {
-         'if': {'filter_query': '{{label}} = {}'.format(i)},
-            'backgroundColor': '#85144b',
-            'color': 'white'
-    } for i in x
-    ]
+composite[bf_mask > 0, 2] = 255
+cseg_mask=seg['cseg_mask']
+external_stylesheets = [dbc.themes.BOOTSTRAP, "assets/object_properties_style.css"]
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-app.layout = dash_table.DataTable(
-                                    id="table-line",
-                                    columns=columns,
-                                    data=table.to_dict("records"),
-                                    # tooltip_header={
-                                    #     col: "Select columns with the checkbox to include them in the hover info of the image."
-                                    #     for col in table.columns
-                                    # },
-                                    style_header={
-                                        "textDecoration": "underline",
-                                        "textDecorationStyle": "dotted",
-                                    },
-                                    tooltip_delay=0,
-                                    tooltip_duration=None,
-                                    filter_action="native",
-                                    row_deletable=True,
-                                    column_selectable="multi",
-                                    # selected_columns=initial_columns,df.loc[df['label']==1,['label']]
-                                    # style_data_conditional=[
-                                    #         {
-                                    #              'if': {'filter_query': '{{label}} = {}'.format(i)},
-                                    #                 'backgroundColor': '#85144b',
-                                    #                 'color': 'white'
-                                    #         } for i in x
-                                    #     ],
-                                    style_data_conditional = z,
-                                    style_table={"overflowY": "scroll"},
-                                    fixed_rows={"headers": False, "data": 0},
-                                    style_cell={"width": "85px"},
-                                    page_size=10,
-                                )
-
-if __name__ == '__main__':
-    app.run_server()
 
 
+app.layout = html.Div(
+    [
+            dbc.Button('Target', id='target', color="success", className="me-1", n_clicks=0, active=True,
+                                   style={'font-weight': 'normal'}, size='lg'),
+            html.Div(id='Tab_image_display'),
+            dcc.Store(id='json_img'),
+            dcc.Store(id='json_roi',storage_type='local'),
+            html.Div(id='dump',hidden=True),
+            html.Div(id='txt_out'),
+    ]
+)
 
-from dash import Dash, html, Input, Output, callback_context
+@app.callback(
+    [Output('dump', "children"),
+     Output('json_img','data'),
+     Output('txt_out','children'),
+     Output('json_roi', 'data'),
+     ],
+    [Input('graph','clickData'),
+    State('json_roi', 'data')])
 
-app = Dash(__name__)
+def display_selected_data(clickData,roi):
+    if clickData is None:
+        return dash.no_update,dash.no_update,dash.no_update
+    else:
+        #load 3d np array with seed segmentation
+        points = clickData['points']
+        value = cseg_mask[points[0]['y'],points[0]['x']]
+        if roi is None:
+            roi = []
+            roi.append(value)
+        else:
+            roi.append(value)
+        bf_mask_sel = np.zeros(np.shape(cseg_mask),dtype=np.int32)
+        bf_mask_sel[cseg_mask == value] = value
+        c_mask = dx.binary_frame_mask_single_point(bf_mask_sel)
+        c_mask = np.where(c_mask == 1, True, False)
+        composite[c_mask > 0, 1] = 255
+        json_object_fig_updata = json.dumps(composite.tolist())
+        return json.dumps(clickData, indent=2),json_object_fig_updata, [dbc.Alert(['ROI_{}'.format(i) for i in roi])],roi
+#display_mask
+@app.callback(
+            Output('Tab_image_display', 'children'),
+             [Input('target','n_clicks'),
+            State('json_img','data')])
+def display_image(n,json_img):
+    try:
+        img_jason = img_as_ubyte(color.gray2rgb(np.array(json.loads(json_img))))
+    except:
+        img = img_as_ubyte(composite)
+        img_input_rgb_pil = Image.fromarray(img)
+        fig = px.imshow(img_input_rgb_pil, binary_string=True, binary_backend="jpg", )
+        return dcc.Graph(
+            id="graph",
+            figure=fig)
+    else:
+        img_input_rgb_pil = Image.fromarray(img_jason)
+        fig = px.imshow(img_input_rgb_pil, binary_string=True, binary_backend="jpg", )
+        return dcc.Graph(id="graph",figure=fig)
+
+
+if __name__ == "__main__":
+    app.run_server(debug=False)

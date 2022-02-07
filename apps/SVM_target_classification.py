@@ -69,8 +69,8 @@ layout = html.Div(
             dcc.Store(id='json_mask_target'),
             dcc.Store(id='json_table_prop'),
             dcc.Store(id='json_img'),
-            dcc.Store(id = 'json_selected_roi'),
-            dcc.Store(id = 'json_update_prop_table_temp'),
+            dcc.Store(id = 'json_selected_roi',storage_type='local'),
+            dcc.Store(id = 'json_update_prop_table_temp',storage_type='local'),
             dcc.Store(id = 'json_roi_temp'),
             dcc.Store(id = 'json_update_prop_table'),
             ])
@@ -200,18 +200,19 @@ def Generate_segmentation_and_table(image,channel,bs,os,osd,ron,bsc,osc,oscd,gt,
 @app.callback(
     [Output("dump", "children"),
      Output('json_img','data'),
-     Output('json_selected_roi','data'),
-     Output('json_update_prop_table_temp', 'data')],
+     Output('json_selected_roi','data')]
     [Input('graph','clickData'),
     Input('jason_ch2', 'data'),
     Input('json_ch2_gs_rgb', 'data'),
     Input('json_mask_seed', 'data'),
     Input('json_mask_target', 'data'),
      Input('json_label_state','data'),
-     Input('json_table_prop', 'data')])
-def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_object_mask_seed,json_object_mask_target,label_color,table_prop):
+     Input('json_table_prop', 'data'),
+     State('json_roi_temp','data'),
+     State('json_selected_roi','data')])
+def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_object_mask_seed,json_object_mask_target,label_color,table_prop,roi_temp,roi):
     if clickData is None:
-        return dash.no_update,dash.no_update,dash.no_update,dash.no_update
+        return dash.no_update,dash.no_update,dash.no_update
     else:
         label_color_sel = json.loads(label_color)
         if 'target' in label_color_sel[0]:
@@ -233,7 +234,12 @@ def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_objec
         else:
             ch2_rgb[c_mask > 0, 0] = 255
         json_object_fig_updata = json.dumps(ch2_rgb.tolist())
-        roi_sel = json.dumps(value.tolist())
+        if roi is None:
+            roi_sel = []
+            roi_sel = roi_sel.append(value)
+        else:
+            roi.append(value)
+            roi_sel = roi
         table = pd.read_json(table_prop, orient='split')
         table['roi_ctrl']=0
         table['roi_trgt']=0
@@ -242,7 +248,7 @@ def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_objec
         else:
             table.loc[table['label'] == int(value), 'roi_ctrl'] = value
         json_table_temp = pd.DataFrame(table).to_json(orient='split')
-        return json.dumps(clickData, indent=2),json_object_fig_updata,roi_sel, json_table_temp
+        return json.dumps(clickData, indent=2),json_object_fig_updata,roi_sel
 
 #display_mask
 @app.callback(
@@ -289,17 +295,16 @@ def update_table(roi_temp,table_temp,label_state):
         return table_temp_json
 
 # store previous roi in json
-@app.callback(Output('json_roi_temp', 'data'),
-              [Input('json_update_prop_table','data'),
-              State('json_selected_roi', 'data')])
-def update_roi_list(_,roi):
-    table_temp = pd.read_json(_, orient='split')
-    roi = json.loads(roi)
-    if roi is None:
-        return dash.no_update
-    else:
-        roi_sel = json.dumps(roi) #update next roi
-        return roi_sel
+# @app.callback(Output('json_roi_temp', 'data'),
+#               [Input('json_update_prop_table','data'),
+#               State('json_selected_roi', 'data')])
+# def update_roi_list(_,roi):
+#     table_temp = pd.read_json(_, orient='split')
+#     roi = roi
+#     if roi is None:
+#         return dash.no_update
+#     else:
+#         return roi
 
 @app.callback(Output('Tab_table_display', 'children'),
             [Input('json_table_prop', 'data'),
@@ -377,7 +382,6 @@ def load_image_and_table(table_prop,roi,label_color):
                                  )
                              )),
                              ])]
-
 
 
 

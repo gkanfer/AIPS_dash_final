@@ -52,7 +52,6 @@ AIPS_object = ai.Segment_over_seed(Image_name='dmsot0273_0003-512.tif', path=pat
 
 img = AIPS_object.load_image()
 nuc_s = AIPS_object.Nucleus_segmentation(img['1'], inv=False)
-
 ch = img['1']
 ch2 = img['0']
 #ch2 = ch2*2**16
@@ -383,7 +382,7 @@ app.layout = html.Div(
     [
         header,
         dbc.Container(
-            [dbc.Row([dbc.Col(image_card, md=5), dbc.Col(table_card, md=7)])],
+            html.Div(id='Tab_image_display'),
             fluid=True,
         ),
     ]
