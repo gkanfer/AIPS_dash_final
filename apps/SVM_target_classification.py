@@ -28,7 +28,7 @@ import plotly.express as px
 from skimage import io, filters, measure, color, img_as_ubyte
 
 from utils.controls import controls, controls_nuc, controls_cyto
-from utils.Display_composit import image_with_contour, countor_map
+from utils.Display_composit import image_with_contour, countor_map,row_highlight
 from utils import AIPS_functions as af
 from utils import AIPS_module as ai
 from utils import display_and_xml as dx
@@ -262,48 +262,43 @@ def display_image(json_img,json_ch2_gs_rgb):
         fig = px.imshow(img_input_rgb_pil, binary_string=True, binary_backend="jpg", )
         return dcc.Graph(id="graph",figure=fig)
 
-# Selected label
+# Table_display
 
-
-#
-# @app.callback(Output('Tab_table_display', 'children'),
-#             [Input('json_table_prop', 'data'),
-#             Input('selected_roi_ctrl','data'),
-#             Input('selected_roi_target','data'),
-#             Input('json_label_state', 'data')])
-# def load_image_and_table(table_prop,roi_ctrl,roi_target,label_color):
-#     table = pd.read_json(table_prop,orient='split')
-#     if len(roi) < 1:
-#        roi_target = []
-#     else:
-#         roi_target = roi
-#         return  [dbc.Card([
-#                  dbc.CardBody(
-#                      dbc.Row(
-#                          dbc.Col(
-#                              [
-#                              dash_table.DataTable(
-#                                  id="table-line",
-#                                  columns=[{"name": i, "id": i} for i in table.columns],
-#                                  data=table.to_dict("records"),
-#                                  style_header={
-#                                      "textDecoration": "underline",
-#                                      "textDecorationStyle": "dotted",
-#                                  },
-#                                  tooltip_delay=0,
-#                                  tooltip_duration=None,
-#                                  filter_action="native",
-#                                  row_deletable=True,
-#                                  column_selectable="multi",
-#                                  style_table={"overflowX": "scroll"},
-#                                  fixed_rows={"headers": False, "data": 0},
-#                                  style_cell={"width": "85px"},
-#                                  page_size=10,
-#                              ),
-#                          ]
-#                      )
-#                  )),
-#                  ])]
+@app.callback(Output('Tab_table_display', 'children'),
+            [Input('json_table_prop', 'data'),
+            Input('selected_roi_ctrl','data'),
+            Input('selected_roi_target','data'),
+            Input('json_label_state', 'data')])
+def load_image_and_table(table_prop,roi_ctrl,roi_target,label_color):
+    table = pd.read_json(table_prop,orient='split')
+    return  [dbc.Card([
+                 dbc.CardBody(
+                     dbc.Row(
+                         dbc.Col(
+                             [
+                             dash_table.DataTable(
+                                 id="table-line",
+                                 columns=[{"name": i, "id": i} for i in table.columns],
+                                 data=table.to_dict("records"),
+                                 style_data_conditional=row_highlight(roi_ctrl,roi_target),
+                                 style_header={
+                                     "textDecoration": "underline",
+                                     "textDecorationStyle": "dotted",
+                                 },
+                                 tooltip_delay=0,
+                                 tooltip_duration=None,
+                                 filter_action="native",
+                                 row_deletable=True,
+                                 column_selectable="multi",
+                                 style_table={"overflowX": "scroll"},
+                                 fixed_rows={"headers": False, "data": 0},
+                                 style_cell={"width": "85px"},
+                                 page_size=10,
+                             ),
+                         ]
+                     )
+                 )),
+                 ])]
 #     else:
 #         roi = roi
 #         x = table.loc[table['label']==int(roi),'label']
