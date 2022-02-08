@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "07-02-2022 main app - segmentation example - Table present two color ROI"
+git commit -m "08-02-2022 main app - Color ROI works"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''

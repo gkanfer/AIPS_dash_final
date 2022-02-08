@@ -73,6 +73,22 @@ def display_image_label(ch,mask,lable_draw, font_select,font_size):
         draw.text((info_table.iloc[i, 2].astype('int64'), info_table.iloc[i, 1].astype('int64')),str(info_table.iloc[i, sel_lable]), 'red', font=font)
     return info_table, PIL_image
 
+def outline_seg(mask,index):
+    seg_mask_temp = np.zeros(np.shape(mask), dtype=np.int32)
+    seg_mask_temp[mask == index] = index
+    seg_mask_eros_9 = binary_erosion(seg_mask_temp, structure=np.ones((9, 9))).astype(np.float64)
+    seg_mask_eros_3 = binary_erosion(seg_mask_temp, structure=np.ones((3, 3))).astype(np.float64)
+    framed_mask = seg_mask_eros_3 - seg_mask_eros_9
+    return framed_mask
+
+def sum_seg(dict,mask):
+    update_mask = np.zeros(np.shape(mask), dtype=np.int32)
+
+    for item in update_mask.items():
+        update_mask = update_mask + item
+    return update_mask
+
+
 def binary_frame_mask(ch,mask,table=None):
     '''
     Create a mask for NIS-elements to photo-activate for multiple point
@@ -92,12 +108,12 @@ def binary_frame_mask(ch,mask,table=None):
     else:
         info_table=table
     info_table['label'] = range(2, len(info_table) + 2)
-    for i in list(info_table.index.values):
-        seg_mask_temp = np.where(mask == i, 0, mask)
-        seg_mask_eros_9 = binary_erosion(seg_mask_temp, structure=np.ones((9, 9))).astype(np.float64)
-        seg_mask_eros_3 = binary_erosion(seg_mask_temp, structure=np.ones((3, 3))).astype(np.float64)
-        seg_frame = np.where(seg_mask_eros_9 + seg_mask_eros_3 == 2, 3, seg_mask_eros_3)
-        framed_mask = np.where(seg_frame == 3, 0, seg_mask_eros_3)
+    framed_mask = np.zeros(np.shape(mask), dtype=np.int32)
+    if len(info_table['label']) > 1:
+        for i in info_table.index.values:
+            framed_mask = framed_mask + outline_seg(mask,i)
+    else:
+        framed_mask = outline_seg(mask,info_table.index.values)
     return framed_mask
 
 def binary_frame_mask_single_point(mask,table=None):

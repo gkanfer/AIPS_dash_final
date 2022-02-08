@@ -14,7 +14,7 @@ import numpy as np
 from skimage.exposure import rescale_intensity, histogram
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-
+from scipy.ndimage.morphology import binary_opening, binary_erosion, binary_dilation
 from PIL import Image, ImageEnhance
 import base64
 import pandas as pd
@@ -37,122 +37,51 @@ from utils.controls import controls, controls_nuc, controls_cyto
 from utils import AIPS_functions as af
 from utils import AIPS_module as ai
 from utils import display_and_xml as dx
+from utils.Display_composit import image_with_contour, countor_map
 
-
-
-# Set up the app
-external_stylesheets = [dbc.themes.BOOTSTRAP, "assets/object_properties_style.css"]
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-
-# make image and Mask
 path = '/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/'
 #Composite.tif10.tif
-AIPS_object = ai.Segment_over_seed(Image_name='dmsot0273_0003-512.tif', path=path, rmv_object_nuc=0.5, block_size=59,
-                                           offset=-0.0004,block_size_cyto=59, offset_cyto=-0.0004, global_ther=0.2, rmv_object_cyto=0.1,
-                                           rmv_object_cyto_small=0.1, remove_border=False)
+AIPS_object = ai.Segment_over_seed(Image_name='dmsot0273_0003-512.tif', path=path, rmv_object_nuc=0.5, block_size=83,
+                                           offset=0.00001,block_size_cyto=11, offset_cyto=-0.0003, global_ther=0.4, rmv_object_cyto=0.99,
+                                           rmv_object_cyto_small=0.9, remove_border=False)
 
 img = AIPS_object.load_image()
 nuc_s = AIPS_object.Nucleus_segmentation(img['1'], inv=False)
-
 ch = img['1']
 ch2 = img['0']
-#ch2 = ch2*2**16
-ch2 = (ch2/ch2.max())*255
-ch2 = np.uint8(ch2)
-composite = np.zeros((np.shape(ch2)[0],np.shape(ch2)[1],3),dtype=np.uint8)
-composite[:,:,0] = ch2
-composite[:,:,1] = ch2
-composite[:,:,2] = ch2
-img = composite
-# mask
-label_array = nuc_s['sort_mask']
-current_labels = np.unique(label_array)[np.nonzero(np.unique(label_array))]
-prop_names = [
-    "label",
-    "area",
-    "eccentricity",
-    "euler_number",
-    "extent",
-    "feret_diameter_max",
-    "inertia_tensor",
-    "inertia_tensor_eigvals",
-    "moments",
-    "moments_central",
-    "moments_hu",
-    "moments_normalized",
-    "orientation",
-    "perimeter",
-    "perimeter_crofton",
-    # "slice",
-    "solidity"
-]
-prop_table = measure.regionprops_table(
-    label_array, intensity_image=img, properties=prop_names
-)
-table = pd.DataFrame(prop_table)
-columns = [
-    {"name": label_name, "id": label_name,"type": "numeric", "selectable": True}
-    for label_name in table.columns]
-df = table
-
-# Format the Table columns
-# columns = [
-#     {"name": label_name, "id": label_name, "selectable": True}
-#     if precision is None
-#     else {
-#         "name": label_name,
-#         "id": label_name,
-#         "type": "numeric",
-#         "selectable": True,
-#     }
-#     for label_name, precision in zip(prop_names, (None, None, 4, 4, None, 3))]
-columns = [{"name": i, "id": i} for i in table.columns]
-initial_columns = ["label", "area"]
-
-def row_highlight(roi_list_ctrl,roi_list_target):
-    return  ([
-             {'if': {'filter_query': '{{label}} = {}'.format(int(roi_ctrl))},
-                 'backgroundColor': '{}'.format('#F31515'),
-                 'color': 'white'
-             }
-            for roi_ctrl in roi_list_ctrl
-            ]+
-            [
-                 {'if': {'filter_query': '{{label}} = {}'.format(int(roi_))},
-                     'backgroundColor': '{}'.format('#1ABA19'),
-                     'color': 'white'
-                 }
-            for roi_ in roi_list_target
-            ])
-
-y =[1,2,4]
-x =[6,7,9]
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-app.layout = dash_table.DataTable(
-                                    id="table-line",
-                                    columns=columns,
-                                    data=table.to_dict("records"),
-                                    style_header={
-                                        "textDecoration": "underline",
-                                        "textDecorationStyle": "dotted",
-                                    },
-                                    tooltip_delay=0,
-                                    tooltip_duration=None,
-                                    filter_action="native",
-                                    row_deletable=True,
-                                    column_selectable="multi",
-                                    style_data_conditional=row_highlight(roi_list_ctrl=x,roi_list_target=y),
-                                    style_table={"overflowY": "scroll"},
-                                    fixed_rows={"headers": False, "data": 0},
-                                    style_cell={"width": "85px"},
-                                    page_size=10,
-                                )
-
-if __name__ == '__main__':
-    app.run_server()
+seg = AIPS_object.Cytosol_segmentation( ch,ch2,nuc_s['sort_mask'],nuc_s['sort_mask_bin'])
+cseg_mask = seg['cseg_mask']
+np.unique(cseg_mask)
+plt.imshow(cseg_mask)
 
 
+ch2 = (ch2 / ch2.max()) * 255
+ch2_u8 = np.uint8(ch2)
+rgb_input_img = np.zeros((np.shape(ch2_u8)[0], np.shape(ch2_u8)[1], 3), dtype=np.uint8)
+rgb_input_img[:, :, 0] = ch2_u8
+rgb_input_img[:, :, 1] = ch2_u8
+rgb_input_img[:, :, 2] = ch2_u8
+bf_mask = dx.binary_frame_mask(ch2_u8, seg['sort_mask_sync'])
+bf_mask = np.where(bf_mask == 1, True, False)
+rgb_input_img[bf_mask > 0, 2] = 255
+valuectrl = [87,133,145]
+valuectrl = []
+#valuetarget = [164,203,223]
+valuetarget = [203,223]
+cseg_mask = seg['cseg_mask']
 
-from dash import Dash, html, Input, Output, callback_context
 
-app = Dash(__name__)
+rgb = countor_map(cseg_mask,valuectrl,valuetarget,rgb_input_img)
+plt.imshow(rgb)
+
+bf_mask_sel_ctrl = np.zeros(np.shape(cseg_mask), dtype=np.int32)
+for list in valuectrl:
+    bf_mask_sel_ctrl[cseg_mask == list] = list
+plt.imshow(bf_mask_sel_ctrl)
+
+
+bf_mask_sel_trgt = np.zeros(np.shape(cseg_mask), dtype=np.int32)
+for list_ in valuetarget:
+    bf_mask_sel_trgt[cseg_mask == list_] = list_
+np.unique(bf_mask_sel_trgt)
+

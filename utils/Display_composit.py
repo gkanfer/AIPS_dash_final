@@ -142,10 +142,16 @@ def image_with_contour(img, active_labels, data_table, active_columns, color_col
     )
     return fig
 #https://dash.plotly.com/datatable/conditional-formatting
-def row_highlight(roi_list_ctrl,cl_ctrl='#F31515',roi_list_target,cl_target='#1ABA19'):
+def row_highlight(roi_list_ctrl,roi_list_target):
+    '''
+        Componant of Dash datatable - highlight raws in the table
+        :parameter
+        roi_list_ctrl - list of ROI - in red #F31515
+        roi_list_target -  list of ROI - in green #1ABA19
+    '''
     return  ([
                  {'if': {'filter_query': '{{label}} = {}'.format(int(roi_ctrl))},
-                     'backgroundColor': '{}'.format(cl_ctrl),
+                     'backgroundColor': '{}'.format('#F31515'),
                      'color': 'white'
                  }
                 for roi_ctrl in roi_list_ctrl
@@ -154,11 +160,39 @@ def row_highlight(roi_list_ctrl,cl_ctrl='#F31515',roi_list_target,cl_target='#1A
                  {
                      'if':
                          {'filter_query': '{{label}} = {}'.format(int(roi_))},
-                        'backgroundColor': '{}'.format(cl_target),
+                        'backgroundColor': '{}'.format('#1ABA19'),
                         'color': 'white'
                  }
                 for roi_ in roi_list_target
             ])
+
+def countor_map(mask_target,roi_ctrl,roi_target,ch2_rgb):
+    ''':parameter
+        mask_target - contour target channel
+        ROI - current click point and the list of the last clicks
+        ch2_rgb - with seed is displayed in blue
+        return:
+        an rGB image with seed and clicked target segment map.
+    '''
+    if len(roi_ctrl) > 0:
+        bf_mask_sel_ctrl = np.zeros(np.shape(mask_target), dtype=np.int32)
+        #adding ctrl map
+        for list in roi_ctrl:
+            bf_mask_sel_ctrl[mask_target == list] = list
+        c_mask_ctrl = dx.binary_frame_mask(ch2_rgb, bf_mask_sel_ctrl)
+    else:
+        c_mask_ctrl = np.zeros(np.shape(mask_target), dtype=np.int32)
+    # adding target map
+    if len(roi_target) > 0:
+        bf_mask_sel_trgt = np.zeros(np.shape(mask_target), dtype=np.int32)
+        for list in roi_target:
+            bf_mask_sel_trgt[mask_target == list] = list
+        c_mask_trgt = dx.binary_frame_mask(ch2_rgb, bf_mask_sel_trgt)
+    else:
+        c_mask_trgt = np.zeros(np.shape(mask_target), dtype=np.int32)
+    ch2_rgb[c_mask_ctrl > 0, 0] = 255
+    ch2_rgb[c_mask_trgt > 0, 1] = 255
+    return ch2_rgb
 
 
 
