@@ -299,47 +299,7 @@ def load_image_and_table(table_prop,roi_ctrl,roi_target,label_color):
                      )
                  )),
                  ])]
-#     else:
-#         roi = roi
-#         x = table.loc[table['label']==int(roi),'label']
-#         label_color_sel = json.loads(label_color)
-#         if 'target' in label_color_sel[0]:
-#             color = '#1ABA19'
-#         else:
-#             color = '#F31515'
-#         return  [dbc.Card([
-#                          dbc.CardBody(
-#                              dbc.Row(
-#                                  dbc.Col(
-#                                      [
-#                                          dash_table.DataTable(
-#                                              id="table-line",
-#                                              # columns=columns,
-#                                              data=table.to_dict("records"),
-#                                              columns= [{"name": i, "id": i}
-#                                                        for i in table.columns],
-#                                              style_data_conditional=[
-#                                                  {
-#                                                      'if': {'filter_query': '{{label}} = {}'.format(int(x))},
-#                                                      'backgroundColor': '{}'.format(color),
-#                                                      'color': 'white'
-#                                                  }
-#                                              ],
-#                                              tooltip_delay=0,
-#                                              tooltip_duration=None,
-#                                              filter_action="native",
-#                                              row_deletable=True,
-#                                              column_selectable="multi",
-#                                              style_table={"overflowX": "scroll"},
-#                                              fixed_rows={"headers": False, "data": 0},
-#                                              style_cell={"width": "85px"},
-#                                              row_selectable="multi",
-#                                              page_size=10,
-#                                          ),
-#                                      ]
-#                                  )
-#                              )),
-#                              ])]
+
 
 
 

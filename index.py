@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "08-02-2022 main app - Picking cells completed"
+git commit -m "08-02-2022 main index_change_encoded image to px.express image type"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageEnhance
 import base64
 import pandas as pd
+import plotly.express as px
 import re
 from random import randint
 from io import BytesIO
@@ -383,43 +384,46 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
     pix = af.show_image_adjust(ch_, low_prec=low, up_prec=high)
     pix = pix * 65535.000
     im_pil = Image.fromarray(np.uint16(pix))
-    im_pil.save("1.png", format='png')  # this is for image processing
-    encoded_image = base64.b64encode(open("1.png", 'rb').read())
+    fig_ch = px.imshow(im_pil, binary_string=True, binary_backend="jpg",width=500,height=500,title='Seed:'+ Channel_number_1).update_xaxes(showticklabels = False).update_yaxes(showticklabels = False)
+    fig_ch.update_layout(title_x=0.5)
     pix_2 = af.show_image_adjust(ch2_, low_prec=low, up_prec=high)
     pix_2 = pix_2 * 65535.000
     im_pil = Image.fromarray(np.uint16(pix_2))
-    im_pil.save("2.png", format='png')  # this is for image processing
-    encoded_image_ch2 = base64.b64encode(open("2.png", 'rb').read())
+    fig_ch2 = px.imshow(im_pil, binary_string=True, binary_backend="jpg",width=500,height=500,title='Target:'+ Channel_number_2).update_xaxes(showticklabels = False).update_yaxes(showticklabels = False)
+    fig_ch.update_layout(title_x=0.5)
     '''
     Nucleus segmentation 
     '''
-    encoded_image_nmask2 = af.save_pil_to_directory(nmask2, bit=1, mask_name='nmask2')
-    encoded_image_sort_mask = af.save_pil_to_directory(sort_mask, bit=3, mask_name='sort_mask')
+    im_pil_nmask2 = af.px_pil_figure(nmask2, bit=1, mask_name='nmask2',fig_title='Local threshold map - seed',wh=500)
+    # get overlay of seed and nuclei
+    ch1_sort_mask = af.rgb_file_gray_scale(ch_,mask=sort_mask,channel=0)
+    fig_im_pil_sort_mask = af.px_pil_figure(ch1_sort_mask, bit=3, mask_name='sort_mask',fig_title='RGB map - seed',wh=500)
     '''
     Cytosol  segmentation 
     '''
+
     cell_mask_2 = np.where(cell_mask_1 == 1, True, False)
     combine = np.where(combine == 1, True, False)
-    encoded_image_cell_mask_2 = af.save_pil_to_directory(cell_mask_2, bit=1, mask_name='_cell_mask')
-    encoded_image_cell_combine = af.save_pil_to_directory(combine, bit=1, mask_name='_combine')
-    encoded_image_cseg_mask = af.save_pil_to_directory(cseg_mask, bit=3, mask_name='_cseg')
-    encoded_image_mask_unfiltered = af.save_pil_to_directory(mask_unfiltered, bit=3, mask_name='_csegg')
+    fig_im_pil_cell_mask_2 = af.px_pil_figure(cell_mask_2, bit=1, mask_name='_cell_mask',fig_title='Local threshold map - seed',wh=500)
+    fig_im_pil_cell_combine = af.px_pil_figure(combine, bit=1, mask_name='_combine',fig_title='Local threshold map - seed',wh=500)
+
+    ch2_cseg_mask = af.rgb_file_gray_scale(ch2_, mask=cseg_mask, channel=0)
+    fig_im_pil_cseg_mask = af.px_pil_figure(ch2_cseg_mask, bit=3, mask_name='_cseg',fig_title='Mask - Target (filterd)',wh=500)
+
+    ch2_mask_unfiltered = af.rgb_file_gray_scale(ch2_, mask=mask_unfiltered, channel=0)
+    fig_im_pil_mask_unfiltered = af.px_pil_figure(mask_unfiltered, bit=3, mask_name='_csegg',fig_title='Mask - Target',wh=500)
     len_unfiltered_table = table_unfiltered
     if tab_input == 'load_tab':
         return [
             dbc.Row([
-                dbc.Col([
                     dbc.Col(
-                    html.Label('Seed: ' + Channel_number_1, style={'text-align-last': 'center'})),
+                        dcc.Graph(
+                            id="graph_ch",
+                            figure=fig_ch), md=6),
                     dbc.Col(
-                    html.Img(id="img-load", src='data:image/png;base64,{}'.format(encoded_image.decode()),
-                             style={'width': '90%', 'height': 'auto'}))]),
-                dbc.Col([
-                    dbc.Col(
-                    html.Label('Target: ' + Channel_number_2, style={'text-align-last': 'center'})),
-                    dbc.Col(
-                    html.Img(id="img-load", src='data:image/png;base64,{}'.format(encoded_image_ch2.decode()),
-                             style={'width': '90%', 'height': 'auto'}))]),
+                        dcc.Graph(
+                            id="graph_ch2",
+                            figure=fig_ch2), md=6),
                     ]),
             html.Br(),
             html.Br(),
@@ -444,84 +448,72 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
     elif tab_input == 'Nucleus-tab':
         return [
             dbc.Row([
-                dbc.Col([
-                    dbc.Col(html.Label('Seed Image', style={'text-align': 'right'})),
-                    dbc.Col(html.Img(id="img-output-orig", src='data:image/png;base64,{}'.format(encoded_image.decode()),
-                                     style={'width': '100%', 'height': 'auto'}, alt="re-adjust parameters", title="ORIG"))
-                             ]),
-                dbc.Col([
-                    dbc.Col(html.Label('Local threshold map - seed', style={'text-align': 'right'})),
-                    dbc.Col(html.Img(id="img-output-orig", src='data:image/png;base64,{}'.format(encoded_image_nmask2.decode()),
-                                     style={'width': '100%', 'height': 'auto'}, alt="re-adjust parameters", title="ORIG"))
-                                 ])
-                    ]),
-            dbc.Row([
-                dbc.Col([
-                dbc.Col(html.Label('RGB map - seed', style={'text-align': 'right'})),
                 dbc.Col(
-                    html.Img(id="img-output-orig", src='data:image/png;base64,{}'.format(encoded_image_sort_mask.decode()),
-                             style={'width': '50%', 'height': 'auto'}, alt="re-adjust parameters", title="ORIG"))
-                    ])
+                    dcc.Graph(
+                        id="graph_im_pil_nmask2",
+                        figure=im_pil_nmask2), md=6),
+                dbc.Col(
+                    dcc.Graph(
+                        id="graph_fig_im_pil_sort_mask",
+                        figure=fig_im_pil_sort_mask), md=6),
                     ]),
+            html.Br(),
+            html.Br(),
+            dbc.Col([
+                dbc.Row(html.Label('Image parameters:')),
+                html.P([
+                    dbc.Row(html.Label("Image size: {} x {}".format(image_size_x, image_size_y))),
+                    html.Br(),
+                    dbc.Row(html.Label('Seed Image parameters:')),
+                    html.P([
+                        dbc.Row(html.Label("Median object area: {}".format(med_seed))),
+                        dbc.Row(html.Label("Number of objects detected: {}".format(len_seed))), ]),
+                    dbc.Row(html.Label('Target Image Parameters :')),
+                    html.P([
+                        dbc.Row(html.Label("Median object area: {}".format(med_cyto))),
+                        dbc.Row(html.Label("Number of objects detected: {}".format(len_cyto)))]),
+                ])]),
             dbc.Row(
                 dbc.Col(
                     next_Cell, width=3))
                 ]
-
     elif tab_input == 'Cell-tab':
-        return [dbc.Row([
-
-                        dbc.Col([html.Label('Target image', style={'text-align': 'center'}),
-                        html.Br(),
-                        html.Img(id="img-output-orig-target",
-                                  src='data:image/png;base64,{}'.format(encoded_image_ch2.decode()),
-                                  style={'width': '100%', 'height': 'auto'},
-                                  alt="re-adjust parameters",
-                                  title="Local Threshold")]),
-                        dbc.Col([html.Label('Local threshold map - Target', style={'text-align': 'center'}),
-                        html.Br(),
-                        html.Img(id="img-output-mask-target",
-                                  src='data:image/png;base64,{}'.format(encoded_image_cell_mask_2.decode()),
-                                  style={'max-width': '100%', 'height': 'auto'},
-                                  alt="re-adjust parameters",
-                                  title='Local threshold map - Target')
-                         ])
-
-                                        ]),
-                dbc.Row([
-                    dbc.Col([html.Label('Mask - Target', style={'text-align': 'center'}),
-                            html.Br(),
-                            html.Img(id="img-output-mask-target",
-                                          src='data:image/png;base64,{}'.format(encoded_image_mask_unfiltered.decode()),
-                                          style={'max-width': '100%', 'height': 'auto'},
-                                          alt="re-adjust parameters",
-                                          title='Global Threshold - Target')
-                                 ]),
-                    dbc.Col([html.Label('Mask - Target (filterd)', style={'text-align': 'center'}),
-                             html.Br(),
-                             html.Img(id="img-output-mask-target",
-                                      src='data:image/png;base64,{}'.format(encoded_image_cseg_mask.decode()),
-                                      style={'max-width': '100%', 'height': 'auto'},
-                                      alt="re-adjust parameters",
-                                      title='Local threshold map - seed')
-                             ])]),
-            html.Br(),
-            html.Br(),
+        return [
             dbc.Row([
-                dbc.Accordion([
-                dbc.AccordionItem(
-                    title="Cytosole segmentation inspection", children=[
-                       dbc.Row(html.Label("Number of objects detected before filtering: {}".format(len_unfiltered_table.iloc[0,0]))),
-                        dbc.Row(html.Label("Number of objects - large filtered: {}".format(len_unfiltered_table.iloc[0, 1]))),
-                        dbc.Row(html.Label("Number of objects - Small filtered:: {}".format(len_unfiltered_table.iloc[0, 2])))
-                                                                        ]
-                                    )
-                                    ])
+                    dbc.Col(
+                        dcc.Graph(
+                            id="graph_fig_im_pil_sort_mask",
+                            figure=fig_im_pil_sort_mask), md=6),
+                    dbc.Col(
+                        dcc.Graph(
+                            id="graph_local_thershold",
+                            figure=fig_im_pil_cell_mask_2), md=6),
                         ]),
-            dbc.Row(
-                dbc.Col(
-                    next_parameter, width=3))
-                ]
+                dbc.Row([
+                    dbc.Col(
+                        dcc.Graph(
+                            id="Mask_Target_unfiltered",
+                            figure=fig_im_pil_mask_unfiltered), md=6),
+                    dbc.Col(
+                        dcc.Graph(
+                            id="Mask_Target",
+                            figure=fig_im_pil_cseg_mask), md=6),
+                        ]),
+                html.Br(),
+                html.Br(),
+                dbc.Row([
+                    dbc.Accordion([
+                    dbc.AccordionItem(
+                        title="Cytosole segmentation inspection", children=[
+                           dbc.Row(html.Label("Number of objects detected before filtering: {}".format(len_unfiltered_table.iloc[0,0]))),
+                            dbc.Row(html.Label("Number of objects - large filtered: {}".format(len_unfiltered_table.iloc[0, 1]))),
+                            dbc.Row(html.Label("Number of objects - Small filtered:: {}".format(len_unfiltered_table.iloc[0, 2])))
+                                ])
+                            ])]),
+                dbc.Row(
+                    dbc.Col(
+                        next_parameter, width=3))
+                    ]
     elif tab_input == 'save-tab':
             with open('parameters.csv', 'w') as fp:
                 pass

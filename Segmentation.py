@@ -45,6 +45,11 @@ AIPS_object = ai.Segment_over_seed(Image_name='dmsot0273_0003-512.tif', path=pat
                                            offset=0.00001,block_size_cyto=11, offset_cyto=-0.0003, global_ther=0.4, rmv_object_cyto=0.99,
                                            rmv_object_cyto_small=0.9, remove_border=False)
 
+
+AIPS_object = ai.Segment_over_seed(Image_name='dmsot0273_0003-512.tif', path=path, rmv_object_nuc=0.99, block_size=83,
+                                           offset=0.01,block_size_cyto=13, offset_cyto=-0.0003, global_ther=0.4, rmv_object_cyto=0.99,
+                                           rmv_object_cyto_small=0.9, remove_border=False)
+
 img = AIPS_object.load_image()
 nuc_s = AIPS_object.Nucleus_segmentation(img['1'], inv=False)
 ch = img['1']
@@ -54,6 +59,14 @@ cseg_mask = seg['cseg_mask']
 np.unique(cseg_mask)
 plt.imshow(cseg_mask)
 
+sort_mask = nuc_s['sort_mask']
+plt.imshow(sort_mask)
+len(np.unique(sort_mask))
+
+
+
+test = af.rgb_file_gray_scale(ch2,mask=cseg_mask,channel=1)
+plt.imshow(test)
 
 ch2 = (ch2 / ch2.max()) * 255
 ch2_u8 = np.uint8(ch2)
@@ -85,3 +98,10 @@ for list_ in valuetarget:
     bf_mask_sel_trgt[cseg_mask == list_] = list_
 np.unique(bf_mask_sel_trgt)
 
+def test(x,k=None):
+    x = x*2
+    if k is not None:
+        x = x*2 + k
+    return x
+
+print(test(2,3))
