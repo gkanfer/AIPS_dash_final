@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "08-02-2022 main index_change_encoded image to px.express image type"
+git commit -m "02-10-2022 main index_change_encoded image to px.express image type and save changes of parameter file"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
@@ -46,20 +46,6 @@ next_Nucleus = dbc.Button('Next', id='Nucleus-val', n_clicks=0, color="success",
 next_Cell = dbc.Button('Next', id='Cell-val', n_clicks=0,color="Danger", className="me-1", style={'padding': '10px 24px'})
 next_parameter = dbc.Button('Next', id='parameter-val', n_clicks=0, color="Info", className="me-1", style={'padding': '10px 24px'})
 next_module = dbc.Button('Next', id='module-val', n_clicks=0, color="Secondary", className="me-1", style={'padding': '10px 24px'})
-
-
-# loading jason
-class NumpyEncoder(json.JSONEncoder):
-    """ Special json encoder for numpy types """
-    def default(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        elif isinstance(obj, np.floating):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
-
 
 timeout = 10
 
@@ -141,15 +127,17 @@ app.layout = dbc.Container(
     Output('offset_cyto_store', 'data'),
     Output('global_ther', 'value'),
     Output('rmv_object_cyto', 'value'),
-    Output('rmv_object_cyto_small', 'value')
+    Output('rmv_object_cyto_small', 'value'),
+    Output('set-val','n_clicks'),
+    Output('set-val-cyto','n_clicks'),
      ],
     [Input('submit-parameters', 'n_clicks'),
      State('upload-csv', 'filename'),
      State('upload-csv', 'contents')])
 def Load_image(n,pram,cont):
-    if n is None:
+    if n < 1:
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update,\
-               dash.no_update,dash.no_update, dash.no_update, dash.no_update
+               dash.no_update,dash.no_update, dash.no_update, dash.no_update,dash.no_update,dash.no_update
     parameters = parse_contents(cont,pram)
     channel = int(parameters['act_ch'][0])
     bs = parameters['block_size'][0]
@@ -160,7 +148,9 @@ def Load_image(n,pram,cont):
     gt = parameters['global_ther'][0]
     roc = parameters['rmv_object_cyto'][0]
     rocs = parameters['rmv_object_cyto_small'][0]
-    return channel,bs,os,ron,bsc,osc,gt,roc,rocs
+    set_nuc=1
+    set_cyt=1
+    return channel,bs,os,ron,bsc,osc,gt,roc,rocs,set_nuc,set_cyt
 
 
 @app.callback(
@@ -200,8 +190,12 @@ def update_bar2(bar_slider_zoom):
      State('offset', 'value'),
      State('graduated-bar-slider', 'value'),
      State('upload-image', 'filename'),
-     State('act_ch', 'value')])
-def Updat_offset(set_n,bar_zoom,au,offset_input,bar_ind,image_input,channel_sel):
+     State('act_ch', 'value'),
+     State('submit-parameters', 'n_clicks'),
+     State('upload-csv', 'filename'),
+     State('upload-csv', 'contents')
+     ])
+def Updat_offset(set_n,bar_zoom,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont):
     if au:
         AIPS_object = ai.Segment_over_seed(Image_name=image_input[0], path=UPLOAD_DIRECTORY, rmv_object_nuc=0.9, block_size=59,
                                            offset=offset_input,block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4, rmv_object_cyto=0.99,
@@ -234,11 +228,21 @@ def Updat_offset(set_n,bar_zoom,au,offset_input,bar_ind,image_input,channel_sel)
         value_marks = {i: i for i in [min_val, max_val]}
         return [min_val, max_val, value_marks, offset_pred,steps]
     else:
-        min_val = 0.001
-        max_val = 0.8
-        value_marks = {i: i for i in [0.001, 0.8]}
-        offset_pred = offset_input
-        steps = 0.001
+        if n_parm > 0:
+            parameters = parse_contents(cont, pram)
+            os = parameters['offset'][0]
+            norm = np.random.normal(os, 0.001, 100)
+            min_val = round(np.min(norm), 4)
+            max_val = round(np.max(norm), 4)
+            steps = (np.max(os) - np.min(os)) / bar_zoom
+            value_marks = {i: i for i in [min_val, max_val]}
+            offset_pred = os
+        else:
+            min_val = 0.001
+            max_val = 0.8
+            value_marks = {i: i for i in [0.001, 0.8]}
+            offset_pred = offset_input
+            steps = 0.001
         return [min_val, max_val, value_marks, offset_pred,steps]
 
 '''
@@ -268,8 +272,12 @@ def update_bar3(bar_slider_cyto_zoom):
      State('offset_cyto', 'value'),
      State('graduated-bar-cyto', 'value'),
      State('upload-image', 'filename'),
-     State('act_ch', 'value')])
-def Updat_offset_cyto(set_n,bar_zoom_cyto,au,offset_input,bar_ind,image_input,channel_sel):
+     State('act_ch', 'value'),
+    State('submit-parameters', 'n_clicks'),
+     State('upload-csv', 'filename'),
+     State('upload-csv', 'contents')
+     ])
+def Updat_offset_cyto(set_n,bar_zoom_cyto,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont):
     if au:
         AIPS_object = ai.Segment_over_seed(Image_name=image_input[0], path=UPLOAD_DIRECTORY, rmv_object_nuc=0.9, block_size=59,
                                            offset=offset_input,block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4, rmv_object_cyto=0.99,
@@ -302,11 +310,21 @@ def Updat_offset_cyto(set_n,bar_zoom_cyto,au,offset_input,bar_ind,image_input,ch
         value_marks = {i: i for i in [min_val, max_val]}
         return [min_val, max_val, value_marks, offset_pred,steps]
     else:
-        min_val = 0.001
-        max_val = 0.8
-        value_marks = {i: i for i in [0.001, 0.8]}
-        offset_pred = offset_input
-        steps = 0.001
+        if n_parm > 0:
+            parameters = parse_contents(cont, pram)
+            osc = parameters['offset_cyto'][0]
+            norm = np.random.normal(osc, 0.001, 100)
+            min_val = round(np.min(norm), 4)
+            max_val = round(np.max(norm), 4)
+            steps = (np.max(os) - np.min(os)) / bar_zoom_cyto
+            value_marks = {i: i for i in [min_val, max_val]}
+            offset_pred = os
+        else:
+            min_val = 0.001
+            max_val = 0.8
+            value_marks = {i: i for i in [0.001, 0.8]}
+            offset_pred = offset_input
+            steps = 0.001
         return [min_val, max_val, value_marks, offset_pred,steps]
 
 @app.callback(
@@ -515,18 +533,18 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
                         next_parameter, width=3))
                     ]
     elif tab_input == 'save-tab':
-            with open('parameters.csv', 'w') as fp:
-                pass
-            return [
-                    dbc.Row(html.P('Update the parameters.xml file from the parental folder:')),
-                    html.Br(),
-                    dbc.Row([
-                        html.Button("Update", id="btn_update"),
-                        html.Div(id='Progress',hidden=False)]),
-                dbc.Row(
-                    dbc.Col(
-                        next_module, width=3))
-                ]
+        with open('parameters.csv', 'w') as fp:
+            pass
+        return [
+                dbc.Row(html.P('Update the parameters.xml file from the parental folder:')),
+                html.Br(),
+                dbc.Row([
+                    html.Button("Update", id="btn_update"),
+                    html.Div(id='Progress',hidden=False)]),
+            dbc.Row(
+                dbc.Col(
+                    next_module, width=3))
+            ]
     elif tab_input == "Module-tab":
         return [
             dbc.Accordion(
@@ -606,13 +624,14 @@ def Load_parameters_xml(nnn,channel,bs,os,ron,bsc,osc,gt,roc,rocs):
 @app.callback(Output('page-content', 'children'),
               [Input('url', 'pathname')])
 def display_page(pathname):
-    if pathname == '/apps/Nuclues_count_predict':
+    if pathname=='/':
+        return dash.no_update
+    elif pathname == '/apps/Nuclues_count_predict':
         return Nuclues_count_predict.layout
     elif pathname == '/apps/SVM_target_classification':
         return SVM_target_classification.layout
     else:
         return "No seed segment were detected, Readjust seed segmentation"
-
 
 
 @app.callback(Output('load_tab-id', 'disabled'),

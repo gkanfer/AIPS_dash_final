@@ -98,10 +98,4 @@ for list_ in valuetarget:
     bf_mask_sel_trgt[cseg_mask == list_] = list_
 np.unique(bf_mask_sel_trgt)
 
-def test(x,k=None):
-    x = x*2
-    if k is not None:
-        x = x*2 + k
-    return x
-
-print(test(2,3))
+0.01*100
