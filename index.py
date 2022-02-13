@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "02-10-2022 main index_change_encoded image to px.express image type and save changes of parameter file"
+git commit -m "02-13-2022 before merging online with the current "
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
