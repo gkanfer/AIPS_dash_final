@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "02-13-2022 before merging online with the current "
+git commit -m "02-11-2022 pathlib"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
@@ -31,6 +31,7 @@ from random import randint
 from io import BytesIO
 from flask_caching import Cache
 from dash.long_callback import DiskcacheLongCallbackManager
+import pathlib
 
 from utils.Dash_functions import parse_contents
 from utils.controls import controls, controls_nuc, controls_cyto, upload_parm
@@ -38,8 +39,8 @@ from utils import AIPS_functions as af
 from utils import AIPS_module as ai
 #import xml.etree.ElementTree as xml
 
-
-UPLOAD_DIRECTORY = "app_uploaded_files"
+PATH = pathlib.Path(__file__)
+UPLOAD_DIRECTORY = PATH.joinpath("../app_uploaded_files").resolve()
 
 next_display = dbc.Button('Next', id='display-val', n_clicks=0, color="Primary", className="me-1", style={'padding': '10px 24px'})
 next_Nucleus = dbc.Button('Next', id='Nucleus-val', n_clicks=0, color="success", className="me-1", style={'padding': '10px 24px'})
@@ -109,6 +110,8 @@ app.layout = dbc.Container(
                             dcc.Tab(label="Select module for activation", id = "Module-tab-id", value="Module-tab",style={'color': 'black'},selected_style={'color': 'red'},disabled=False)
                     ]),
                 html.Div(id='run_content'),
+                dcc.Store(id='json_img_ch',data=None),
+                dcc.Store(id='json_img_ch2',data=None),
                 dcc.Store(id='offset_store',data=None),
                 dcc.Store(id='offset_cyto_store',data=None),
                 dcc.Loading(html.Div(id='img-output'),type="circle",style={'height': '100%', 'width': '100%'}),
@@ -154,18 +157,31 @@ def Load_image(n,pram,cont):
 
 
 @app.callback(
-    Output('run_content', 'children'),
+    [Output('run_content', 'children'),
+    Output('json_img_ch', 'data'),
+    Output('json_img_ch2', 'data'),
+     Output('submit-val', 'n_clicks')],
     [Input('submit-val', 'n_clicks'),
      State('upload-image', 'filename'),
-     State('upload-image', 'contents')])
-def Load_image(n,image,cont):
-    if n is None:
-        return dash.no_update
-    for name, data_a in zip(image, cont):
-        data = data_a.encode("utf8").split(b";base64,")[1]
-        with open(os.path.join(UPLOAD_DIRECTORY, name), "wb") as fp:
-            fp.write(base64.decodebytes(data))
-    return [html.Button('Run', id='run-val', n_clicks=0)]
+     State('upload-image', 'contents'),
+     Input('act_ch', 'value')])
+def Load_image(n,image,cont,channel_sel):
+    if n == 0:
+        return dash.no_update,dash.no_update,dash.no_update,dash.no_update
+    AIPS_object = ai.AIPS(Image_name=image[0], path=UPLOAD_DIRECTORY)
+    img = AIPS_object.load_image()
+    if channel_sel == 1:
+        nuc_sel = '0'
+        cyt_sel = '1'
+    else:
+        nuc_sel = '1'
+        cyt_sel = '0'
+    ch_ = img[nuc_sel]
+    ch2_ = img[cyt_sel]
+    json_object_img_ch = json.dumps(ch_.tolist())
+    json_object_img_ch2 = json.dumps(ch2_.tolist())
+    n=0
+    return [html.Button('Run', id='run-val', n_clicks=0)],json_object_img_ch,json_object_img_ch2,n
 
 @app.callback(Output('graduated-bar', 'value'),
               Input('graduated-bar-slider', 'value'))
@@ -186,6 +202,7 @@ def update_bar2(bar_slider_zoom):
      Output('offset', 'step')],
     [Input('set-val','n_clicks'),
     Input('graduated-bar-slider-nuc-zoom', 'value'),
+    State('json_img_ch', 'data'),
      State('Auto-nuc', 'on'),
      State('offset', 'value'),
      State('graduated-bar-slider', 'value'),
@@ -195,19 +212,10 @@ def update_bar2(bar_slider_zoom):
      State('upload-csv', 'filename'),
      State('upload-csv', 'contents')
      ])
-def Updat_offset(set_n,bar_zoom,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont):
+def Updat_offset(set_n,bar_zoom,ch,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont):
     if au:
-        AIPS_object = ai.Segment_over_seed(Image_name=image_input[0], path=UPLOAD_DIRECTORY, rmv_object_nuc=0.9, block_size=59,
-                                           offset=offset_input,block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4, rmv_object_cyto=0.99,
-                                           rmv_object_cyto_small=0.9, remove_border=True)
-        img = AIPS_object.load_image()
-        if channel_sel == 1:
-            nuc_sel = '0'
-            cyt_sel = '1'
-        else:
-            nuc_sel = '1'
-            cyt_sel = '0'
-        med_nuc = np.median(img[nuc_sel]) / 100
+        ch_ = np.array(json.loads(ch))
+        med_nuc = np.median(ch_) / 100
         norm = np.random.normal(med_nuc, 0.001*bar_ind, 100)
         offset_pred = []
         for norm_ in norm:
@@ -215,8 +223,7 @@ def Updat_offset(set_n,bar_zoom,au,offset_input,bar_ind,image_input,channel_sel,
                                                block_size=59, offset=norm_,
                                                block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4,
                                                rmv_object_cyto=0.99, rmv_object_cyto_small=0.9, remove_border=True)
-            img = AIPS_object.load_image()
-            nuc_s = AIPS_object.Nucleus_segmentation(img['0'], inv=False)
+            nuc_s = AIPS_object.Nucleus_segmentation(ch_, inv=False)
             offset_pred = norm_
             len_table = len(nuc_s['tabale_init'])
             if len_table > 3:
@@ -268,28 +275,20 @@ def update_bar3(bar_slider_cyto_zoom):
      Output('offset_cyto', 'step')],
     [Input('set-val-cyto','n_clicks'),
      Input('graduated-bar-slider-cyto-zoom', 'value'),
-     State('Auto-cyto', 'on'),
-     State('offset_cyto', 'value'),
-     State('graduated-bar-cyto', 'value'),
-     State('upload-image', 'filename'),
-     State('act_ch', 'value'),
+    State('json_img_ch2', 'data'),
+    State('Auto-cyto', 'on'),
+    State('offset_cyto', 'value'),
+    State('graduated-bar-cyto', 'value'),
+    State('upload-image', 'filename'),
+    State('act_ch', 'value'),
     State('submit-parameters', 'n_clicks'),
-     State('upload-csv', 'filename'),
-     State('upload-csv', 'contents')
+    State('upload-csv', 'filename'),
+    State('upload-csv', 'contents')
      ])
-def Updat_offset_cyto(set_n,bar_zoom_cyto,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont):
+def Updat_offset_cyto(set_n,bar_zoom_cyto,ch2,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont):
     if au:
-        AIPS_object = ai.Segment_over_seed(Image_name=image_input[0], path=UPLOAD_DIRECTORY, rmv_object_nuc=0.9, block_size=59,
-                                           offset=offset_input,block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4, rmv_object_cyto=0.99,
-                                           rmv_object_cyto_small=0.9, remove_border=True)
-        img = AIPS_object.load_image()
-        if channel_sel == 1:
-            nuc_sel = '0'
-            cyt_sel = '1'
-        else:
-            nuc_sel = '1'
-            cyt_sel = '0'
-        med_nuc = np.median(img[nuc_sel]) / 100
+        ch2_ = np.array(json.loads(ch2))
+        med_nuc = np.median(ch2_) / 100
         norm = np.random.normal(med_nuc, 0.001*bar_ind, 100)
         offset_pred = []
         for norm_ in norm:
@@ -297,8 +296,7 @@ def Updat_offset_cyto(set_n,bar_zoom_cyto,au,offset_input,bar_ind,image_input,ch
                                                block_size=59, offset=norm_,
                                                block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4,
                                                rmv_object_cyto=0.99, rmv_object_cyto_small=0.9, remove_border=True)
-            img = AIPS_object.load_image()
-            nuc_s = AIPS_object.Nucleus_segmentation(img['0'], inv=False)
+            nuc_s = AIPS_object.Nucleus_segmentation(ch2_, inv=False)
             offset_pred = norm_
             len_table = len(nuc_s['tabale_init'])
             if len_table > 3:
@@ -331,6 +329,8 @@ def Updat_offset_cyto(set_n,bar_zoom_cyto,au,offset_input,bar_ind,image_input,ch
     Output('img-output', 'children'),
     [Input('run-val', 'n_clicks'),
     Input('tabs', 'value'),
+    Input('json_img_ch', 'data'),
+    Input('json_img_ch2', 'data'),
     State('upload-image', 'filename'),
     State('upload-image', 'contents'),
     Input('act_ch', 'value'),
@@ -347,25 +347,18 @@ def Updat_offset_cyto(set_n,bar_zoom_cyto,au,offset_input,bar_ind,image_input,ch
     Input('rmv_object_cyto', 'value'),
     Input('rmv_object_cyto_small', 'value'),
      ])
-def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs,os,ron,bsc,int_on_cyto,osc,gt,roc,rocs):
-    AIPS_object = ai.Segment_over_seed(Image_name=str(image[0]), path=UPLOAD_DIRECTORY, rmv_object_nuc=ron,
+def Parameters_initiation(nn,tab_input,ch,ch2, image,cont,channel,int_on_nuc,high,low,bs,os,ron,bsc,int_on_cyto,osc,gt,roc,rocs):
+    AIPS_object = ai.Segment_over_seed(Image_name=image[0], path=UPLOAD_DIRECTORY,rmv_object_nuc=ron,
                                        block_size=bs,
                                        offset=os,
                                        block_size_cyto=bsc, offset_cyto=osc, global_ther=gt, rmv_object_cyto=roc,
                                        rmv_object_cyto_small=rocs, remove_border=False)
-    img = AIPS_object.load_image()
-    if channel==1:
-        nuc_sel='0'
-        cyt_sel='1'
-    else:
-        nuc_sel = '1'
-        cyt_sel = '0'
-    nuc_s = AIPS_object.Nucleus_segmentation(img[nuc_sel])
-    seg = AIPS_object.Cytosol_segmentation(img[nuc_sel],img[cyt_sel],nuc_s['sort_mask'],nuc_s['sort_mask_bin'])
+    ch_ = np.array(json.loads(ch))
+    ch2_ = np.array(json.loads(ch2))
+    nuc_s = AIPS_object.Nucleus_segmentation(ch_)
+    seg = AIPS_object.Cytosol_segmentation(ch_,ch2_,nuc_s['sort_mask'],nuc_s['sort_mask_bin'])
     # dict_ = {'img':img,'nuc':nuc_s,'seg':seg}
     # try to work on img
-    ch_ = img[nuc_sel]
-    ch2_ = img[cyt_sel]
     nmask2 = nuc_s['nmask2']
     nmask4 = nuc_s['nmask4']
     sort_mask = nuc_s['sort_mask']
@@ -409,28 +402,6 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
     im_pil = Image.fromarray(np.uint16(pix_2))
     fig_ch2 = px.imshow(im_pil, binary_string=True, binary_backend="jpg",width=500,height=500,title='Target:'+ Channel_number_2).update_xaxes(showticklabels = False).update_yaxes(showticklabels = False)
     fig_ch.update_layout(title_x=0.5)
-    '''
-    Nucleus segmentation 
-    '''
-    im_pil_nmask2 = af.px_pil_figure(nmask2, bit=1, mask_name='nmask2',fig_title='Local threshold map - seed',wh=500)
-    # get overlay of seed and nuclei
-    ch1_sort_mask = af.rgb_file_gray_scale(ch_,mask=sort_mask,channel=0)
-    fig_im_pil_sort_mask = af.px_pil_figure(ch1_sort_mask, bit=3, mask_name='sort_mask',fig_title='RGB map - seed',wh=500)
-    '''
-    Cytosol  segmentation 
-    '''
-
-    cell_mask_2 = np.where(cell_mask_1 == 1, True, False)
-    combine = np.where(combine == 1, True, False)
-    fig_im_pil_cell_mask_2 = af.px_pil_figure(cell_mask_2, bit=1, mask_name='_cell_mask',fig_title='Local threshold map - seed',wh=500)
-    fig_im_pil_cell_combine = af.px_pil_figure(combine, bit=1, mask_name='_combine',fig_title='Local threshold map - seed',wh=500)
-
-    ch2_cseg_mask = af.rgb_file_gray_scale(ch2_, mask=cseg_mask, channel=0)
-    fig_im_pil_cseg_mask = af.px_pil_figure(ch2_cseg_mask, bit=3, mask_name='_cseg',fig_title='Mask - Target (filterd)',wh=500)
-
-    ch2_mask_unfiltered = af.rgb_file_gray_scale(ch2_, mask=mask_unfiltered, channel=0)
-    fig_im_pil_mask_unfiltered = af.px_pil_figure(mask_unfiltered, bit=3, mask_name='_csegg',fig_title='Mask - Target',wh=500)
-    len_unfiltered_table = table_unfiltered
     if tab_input == 'load_tab':
         return [
             dbc.Row([
@@ -464,6 +435,14 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
                         next_Nucleus, width=3))
             ]
     elif tab_input == 'Nucleus-tab':
+        '''
+           Nucleus segmentation 
+        '''
+        im_pil_nmask2 = af.px_pil_figure(nmask2, bit=1, mask_name='nmask2', fig_title='Local threshold map - seed',
+                                         wh=500)
+        # get overlay of seed and nuclei
+        ch1_sort_mask = af.rgb_file_gray_scale(ch_, mask=sort_mask, channel=0)
+        fig_im_pil_sort_mask = af.px_pil_figure(ch1_sort_mask, bit=3, mask_name='sort_mask', fig_title='RGB map - seed',wh=500)
         return [
             dbc.Row([
                 dbc.Col(
@@ -496,6 +475,27 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
                     next_Cell, width=3))
                 ]
     elif tab_input == 'Cell-tab':
+        '''
+            Cytosol  segmentation 
+        '''
+        ch1_sort_mask = af.rgb_file_gray_scale(ch_, mask=sort_mask, channel=0)
+        fig_im_pil_sort_mask = af.px_pil_figure(ch1_sort_mask, bit=3, mask_name='sort_mask', fig_title='RGB map - seed',
+                                                wh=500)
+        cell_mask_2 = np.where(cell_mask_1 == 1, True, False)
+        combine = np.where(combine == 1, True, False)
+        fig_im_pil_cell_mask_2 = af.px_pil_figure(cell_mask_2, bit=1, mask_name='_cell_mask',
+                                                  fig_title='Local threshold map - seed', wh=500)
+        fig_im_pil_cell_combine = af.px_pil_figure(combine, bit=1, mask_name='_combine',
+                                                   fig_title='Local threshold map - seed', wh=500)
+
+        ch2_cseg_mask = af.rgb_file_gray_scale(ch2_, mask=cseg_mask, channel=0)
+        fig_im_pil_cseg_mask = af.px_pil_figure(ch2_cseg_mask, bit=3, mask_name='_cseg',
+                                                fig_title='Mask - Target (filterd)', wh=500)
+
+        ch2_mask_unfiltered = af.rgb_file_gray_scale(ch2_, mask=mask_unfiltered, channel=0)
+        fig_im_pil_mask_unfiltered = af.px_pil_figure(mask_unfiltered, bit=3, mask_name='_csegg',
+                                                      fig_title='Mask - Target', wh=500)
+        len_unfiltered_table = table_unfiltered
         return [
             dbc.Row([
                     dbc.Col(
