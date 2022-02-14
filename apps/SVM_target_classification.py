@@ -1,4 +1,4 @@
-# use my interpretation of display segmentation
+# color.gray2rgb is removed in the current skitimage creates 4 dimension image
 import dash_daq as daq
 import json
 import dash
@@ -26,6 +26,8 @@ from flask_caching import Cache
 from dash.long_callback import DiskcacheLongCallbackManager
 import plotly.express as px
 from skimage import io, filters, measure, color, img_as_ubyte
+from dash_extensions import Download
+from dash_extensions.snippets import send_data_frame
 
 from utils.controls import controls, controls_nuc, controls_cyto
 from utils.Display_composit import image_with_contour, countor_map,row_highlight
@@ -36,6 +38,7 @@ from utils.Dash_functions import parse_contents
 
 import pathlib
 from app import app
+import glob
 
 PATH = pathlib.Path(__file__).parent
 DATA_PATH = PATH.joinpath("../app_uploaded_files").resolve()
@@ -61,8 +64,17 @@ layout = html.Div(
             dbc.Button('Control', id='control', color="danger", className="me-1", n_clicks=0, active=True,
                        style={'font-weight': 'bold'}, size='sm'),
             html.Div(id='json_label_state'),
-            html.Div(id='Tab_image_display'),
-            daq.BooleanSwitch(id='switch_pick_cell',on=True,label="Select cells",labelPosition="top"),
+            dbc.Row([
+                    dbc.Col([
+                    html.Div(id='Tab_image_display'),
+                    daq.BooleanSwitch(id='switch_pick_cell',on=True,label="Select cells",labelPosition="top"),
+                            ],md=10),
+                    dbc.Col([
+                        dcc.Store(id='storage_list_table', storage_type='session'),
+                        dcc.Dropdown(id='drop_down_tables', multi=True, persistence=True),
+                        html.Div([html.Button("Download csv", id="btn"), Download(id="download")])
+                    ],md=2),
+                ]),
             html.Div(id='dump',hidden=True),
             dcc.Store(id='jason_ch2'),
             dcc.Store(id='json_ch2_gs_rgb'), #3ch
@@ -72,6 +84,7 @@ layout = html.Div(
             dcc.Store(id='json_img'),
             dcc.Store(id='selected_roi_target',storage_type='session'),
             dcc.Store(id='selected_roi_ctrl',storage_type='session'),
+            dcc.Store(id='list_image_name',storage_type='session'),
             ])
     ])
 
@@ -249,9 +262,9 @@ def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_objec
              Input('json_ch2_gs_rgb', 'data')])
 def display_image(json_img,json_ch2_gs_rgb):
     try:
-        img_jason = img_as_ubyte(color.gray2rgb(np.array(json.loads(json_img))))
+        img_jason = img_as_ubyte(np.array(json.loads(json_img)))
     except:
-        img = img_as_ubyte(color.gray2rgb(np.array(json.loads(json_ch2_gs_rgb))))
+        img = img_as_ubyte(np.array(json.loads(json_ch2_gs_rgb)))
         img_input_rgb_pil = Image.fromarray(img)
         fig = px.imshow(img_input_rgb_pil, binary_string=True, binary_backend="jpg", )
         return dcc.Graph(
@@ -262,6 +275,9 @@ def display_image(json_img,json_ch2_gs_rgb):
         fig = px.imshow(img_input_rgb_pil, binary_string=True, binary_backend="jpg", )
         return dcc.Graph(id="graph",figure=fig)
 
+
+
+
 # Table_display
 
 @app.callback(Output('Tab_table_display', 'children'),
@@ -270,7 +286,12 @@ def display_image(json_img,json_ch2_gs_rgb):
             Input('selected_roi_target','data'),
             Input('json_label_state', 'data')])
 def load_image_and_table(table_prop,roi_ctrl,roi_target,label_color):
+    if table_prop is None:
+        return dash.no_update
     table = pd.read_json(table_prop,orient='split')
+    if roi_ctrl is None and roi_target is None:
+        roi_ctrl = []
+        roi_target = []
     return  [dbc.Card([
                  dbc.CardBody(
                      dbc.Row(
@@ -298,10 +319,77 @@ def load_image_and_table(table_prop,roi_ctrl,roi_target,label_color):
                          ]
                      )
                  )),
-                 ])]
+                 ]),
+        dbc.Button('Insert', id='inst', color="danger", className="me-1", n_clicks=0, active=True,
+                   style={'font-weight': 'bold'}, size='sm'),]
+
+# create a dropdown containing all the names of the files as datatable and add the roi-list
+@app.callback([Output('storage_list_table', 'data'),
+                Output('drop_down_tables','options'),
+                Output('drop_down_tables','value'),
+               Output('list_image_name','data')],
+                [Input('inst', 'n_clicks'),
+                Input('upload-image', 'filename'),
+                Input('json_table_prop', 'data'),
+                Input('selected_roi_ctrl','data'),
+                Input('selected_roi_target','data'),
+                Input('storage_list_table', 'data'),
+                Input('list_image_name','data')])
+def update_dropdown_table_list(n,image,table_prop,roi_ctrl,roi_target,table_sum,list_img_name):
+    if n == 0:
+        return dash.no_update,dash.no_update,dash.no_update,dash.no_update
+    if table_prop is None:
+        return dash.no_update,dash.no_update,dash.no_update,dash.no_update
+    table = pd.read_json(table_prop,orient='split')
+    table['class'] = [0]*len(table)
+    table['file_name'] = image[0]
+    if roi_ctrl is None and roi_target is None:
+        roi_ctrl = []
+        roi_target = []
+    else:
+        for roi in roi_ctrl:
+            ind = list(table.loc[table['label'].isin([roi])].index)
+            table.iloc[ind[0],len(table.columns)-2] = 1
+        for roi_t in roi_target:
+            ind = list(table.loc[table['label'].isin([roi_t])].index)
+            table.iloc[ind[0],len(table.columns)-2] = 2
+    if table_sum is not None:
+        table_sum = pd.read_json(table_sum,orient='split')
+        table_sum = table_sum.append(table)
+        table = table_sum
+    json_object_table_sum = pd.DataFrame(table).to_json(orient='split')
+    if list_img_name is None:
+        list_img_name = []
+    else:
+        list_img_name.append(image[0])
+        list_img_name = np.unique(list_img_name)
+    return json_object_table_sum, list_img_name, list_img_name,list_img_name
+
+@app.callback([Output("download", "data"),Output("btn", "n_clicks")],
+              [Input("btn", "n_clicks"),State('storage_list_table', 'data')])
+def generate_csv(n,table_sum):
+    if n==0:
+        return dash.no_update, dash.no_update
+    if table_sum is None:
+        return dash.no_update, dash.no_update
+    table = pd.read_json(table_sum, orient='split')
+    table.drop_duplicates()
+    n=0
+    return send_data_frame(table.to_csv, filename="some_name.csv"),n
 
 
 
 
-
+# @app.callback(
+# Output('store_layout_data', 'data'),
+# [Input(key, value) for key, value in dash_layout_components.items()])
+# def store_layout(time_slider_value, backtest_choice_values, assets_selection_values, graph_selection_values):
+#
+#     data_json = {
+#         'time_slider_value': time_slider_value,
+#         'backtest_choice_values': backtest_choice_values,
+#         'asset_selection_value': assets_selection_values,
+#         'graph_selection_values': graph_selection_values
+#    }
+#    return data_json
 
