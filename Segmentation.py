@@ -50,13 +50,34 @@ from utils import AIPS_module as ai
 from utils import display_and_xml as dx
 from utils.Display_composit import image_with_contour, countor_map
 
+
+def plot_composite_image(img,mask,fig_title,alpha=0.2):
+    # apply colors to mask
+    mask = np.array(mask, dtype=np.int32)
+    mask_deci = (mask - np.min(mask)) / (np.max(mask) - np.min(mask))
+    cm = plt.get_cmap('gist_rainbow')
+    colored_image = cm(mask_deci)
+    colored_image = (colored_image[:, :, :3] * 255).astype(np.uint8)
+    #RGB pil image
+    img_mask = img_as_ubyte(colored_image)
+    im_mask_pil = Image.fromarray(img_mask).convert('RGB')
+    img_gs = img_as_ubyte(img)
+    im_pil = Image.fromarray(img_gs).convert('RGB')
+    im3 = Image.blend(im_pil, im_mask_pil, alpha)
+    fig_ch = px.imshow(im3, binary_string=True, binary_backend="jpg", width=500, height=500, title=fig_title,
+                       binary_compression_level=9).update_xaxes(showticklabels=False).update_yaxes(showticklabels=False)
+    fig_ch.update_layout(title_x=0.5)
+    return fig_ch
+
+
+
+
 path = '/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/'
 #Composite.tif10.tif
 AIPS_object = ai.Segment_over_seed(Image_name='dmsot0273_0003-512.tif', path=path, rmv_object_nuc=0.5, block_size=83,
                                            offset=0.00001,block_size_cyto=11, offset_cyto=-0.0003, global_ther=0.4, rmv_object_cyto=0.99,
                                            rmv_object_cyto_small=0.9, remove_border=False)
 img = AIPS_object.load_image()
-nuc_s = AIPS_object.Nucleus_segmentation(img['1'], inv=False)
 ch = img['1']
 ch2 = img['0']
 
@@ -74,57 +95,124 @@ combine = seg['combine']
 cseg_mask = seg['cseg_mask']
 cseg_mask_bin = seg['cseg_mask_bin']
 info_table = seg['info_table']
-mask_unimport skimage.transform
-import tifffile as tfi
-import numpy as np
-from skimage.filters import threshold_local
-from scipy.ndimage.morphology import binary_opening
-import skimage.morphology as sm
-from skimage.segmentation import watershed
-from skimage import measure
-import os
-import pandas as pd
-from scipy.ndimage.morphology import binary_fill_holes
-import dash_daq as daq
-import json
-import dash
-import dash.exceptions
-import dash_core_components as dcc
-import dash_html_components as html
-import dash_bootstrap_components as dbc
-import dash_table
-from dash.dependencies import Input, Output, State
-import tifffile as tfi
-import glob
-import os
-import numpy as np
-from skimage.exposure import rescale_intensity, histogram
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-from scipy.ndimage.morphology import binary_opening, binary_erosion, binary_dilation
-from PIL import Image, ImageEnhance
-import base64
-import pandas as pd
-import re
-from random import randint
-from io import BytesIO
-from flask_caching import Cache
-from dash.long_callback import DiskcacheLongCallbackManager
-import plotly.express as px
-from skimage import io, filters, measure, color, img_as_ubyte
 
-from utils.controls import controls, controls_nuc, controls_cyto
-from utils import AIPS_functions as af
-from utils import AIPS_module as ai
-from utils import display_and_xml as dx
+input_gs_image = (ch / ch.max()) * 255
+ch2_u8 = np.uint8(input_gs_image)
+rgb_input_img = np.zeros((np.shape(ch2_u8)[0], np.shape(ch2_u8)[1], 3), dtype=np.uint8)
+rgb_input_img[:, :, 0] = ch2_u8
+rgb_input_img[:, :, 1] = ch2_u8
+rgb_input_img[:, :, 2] = ch2_u8
 
-import pathlib
-from app import app
-from utils.controls import controls, controls_nuc, controls_cyto
-from utils import AIPS_functions as af
-from utils import AIPS_module as ai
-from utils import display_and_xml as dx
-from utils.Display_composit import image_with_contour, countor_map
+
+
+a = plot_composite_image(rgb_input_img,sort_mask,'test',alpha=0.2)
+a.show()
+im_pil_nmask2 = af.px_pil_figure(nmask2, bit=1, mask_name='nmask2', fig_title='Local threshold map - seed',wh=500)
+im_pil_nmask2.show()
+
+from PIL import Image
+im1 = Image.open('/Users/kanferg/Desktop/Temp/1/c28.png').convert('L')
+im2 = Image.open('/Users/kanferg/Desktop/Temp/1/i24.png').convert('L')
+
+
+
+input_gs_image = (ch / ch.max()) * 255
+ch2_u8 = np.uint8(input_gs_image)
+rgb_input_img = np.zeros((np.shape(ch2_u8)[0], np.shape(ch2_u8)[1], 3), dtype=np.uint8)
+rgb_input_img[:, :, 0] = ch2_u8
+rgb_input_img[:, :, 1] = ch2_u8
+rgb_input_img[:, :, 2] = ch2_u8
+img_gs = img_as_ubyte(rgb_input_img)
+im_pil = Image.fromarray(img_gs)
+
+img_nmask = img_as_ubyte(nmask2)
+im_nmask = Image.fromarray(img_nmask).convert('RGB')
+plt.imshow(im_nmask)
+
+im3 = Image.blend(im_pil, im_nmask, 0.2)
+plt.imshow(im3)
+
+plt.imshow(sort_mask)
+sort_mask = np.array(sort_mask,np.int32)
+im_nmask = Image.fromarray(sort_mask).convert('RGB')
+plt.imshow(im_nmask)
+im3 = Image.blend(im_pil, im_nmask, 0.2)
+
+
+im3 = Image.blend(im1, im2, 0.8)
+# to show specified image
+im3.show()
+
+import skimage.segmentation as seg
+import skimage.filters as filters
+
+
+#################RGBA
+input_gs_image = (ch / ch.max()) * 255
+ch2_u8 = np.uint8(input_gs_image)
+rgb_input_img = np.zeros((np.shape(ch2_u8)[0], np.shape(ch2_u8)[1], 3), dtype=np.uint8)
+rgb_input_img[:, :, 0] = ch2_u8
+rgb_input_img[:, :, 1] = ch2_u8
+rgb_input_img[:, :, 2] = ch2_u8
+img_gs = img_as_ubyte(rgb_input_img)
+im_pil = Image.fromarray(img_gs).convert('RGBA')
+plt.imshow(im_pil)
+
+sort_mask = nuc_s['sort_mask']
+np.unique(sort_mask)
+sort_mask = np.array(sort_mask,dtype=np.int32)
+norm = (sort_mask - np.min(sort_mask))/(np.max(sort_mask) - np.min(sort_mask))
+norm = norm*256
+sort_mask = np.array(norm,dtype=np.uint8)
+plt.imshow(sort_mask)
+
+cm = plt.get_cmap('gist_rainbow')
+colored_image = cm(sort_mask)
+sort_mask = np.array(sort_mask,dtype=np.int32)
+norm = (sort_mask - np.min(sort_mask))/(np.max(sort_mask) - np.min(sort_mask))
+colored_image = (colored_image[:, :, :3] * 255).astype(np.uint8)
+plt.imshow(colored_image)
+
+
+img_nmask = img_as_ubyte(colored_image)
+im_nmask = Image.fromarray(img_nmask).convert('RGB')
+plt.imshow(im_nmask)
+
+img_gs = img_as_ubyte(rgb_input_img)
+im_pil = Image.fromarray(img_gs).convert('RGB')
+
+im3 = Image.blend(im_pil, im_nmask, 0.2)
+plt.imshow(im3)
+
+
+sort_mask = np.array(sort_mask,dtype=np.int32)
+plt.imshow(sort_mask)
+ch1_sort_mask = af.rgb_file_gray_scale(ch, mask=sort_mask, channel=0)
+
+nmask2 = np.array(nmask2,dtype=np.int32)
+plt.imshow(nmask2)
+im_nmask = Image.fromarray(sort_mask).convert('RGBA')
+plt.imshow(im_nmask)
+im3 = Image.blend(im_pil, im_nmask, 0.5)
+plt.imshow(im3)
+
+info_table = pd.DataFrame(
+            measure.regionprops_table(
+                nmask2,
+                intensity_image=ch,
+                properties=['area', 'label', 'centroid'],
+            )).set_index('label')
+info_table.index.values
+np.unique(sort_mask)
+
+
+
+fig_im_pil_sort_mask = af.px_pil_figure(ch1_sort_mask, bit=3, mask_name='sort_mask', fig_title='RGB map - seed',wh=500)
+
+
+
+
+
 
 path = '/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/'
 #Composite.tif10.tif
@@ -293,5 +381,4 @@ fig_im_pil_mask_unfiltered.show()
 # from skimage.transform import rescale, resize, downscale_local_mean
 # image_rescaled = skimage.transform.rescale(ch, 0.0625, anti_aliasing=False)
 # %timeit x  = threshold_local(image_rescaled, 13, "gaussian", 0.01)
-
 

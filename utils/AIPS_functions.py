@@ -2,6 +2,7 @@
 Function for AIPS DASH
 '''
 import xml.etree.ElementTree as xml
+import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 # from PIL import fromarray
@@ -135,7 +136,7 @@ def show_image_adjust(image, low_prec, up_prec):
 
 def px_pil_figure(img,bit,mask_name,fig_title,wh):
     '''
-    :param img: image input
+    :param img: image input - 3 channel 8 bit image
              bit:1 np.unit16 or 2 np.unit8
              fig_title: title for display on dash
              wh: width and hight in pixels
@@ -217,7 +218,7 @@ def seq(start, end, by=None, length_out=None):
         out.append(end)
     return out
 
-def rgb_file_gray_scale(input_gs_image,mask=None,channel=None,bin_composite=False):
+def rgb_file_gray_scale(input_gs_image,mask=None,channel=None):
     ''' create a 3 channel rgb image from 16bit input image
         optional bin countor image from ROI image
         :parameter
@@ -233,18 +234,40 @@ def rgb_file_gray_scale(input_gs_image,mask=None,channel=None,bin_composite=Fals
     rgb_input_img[:, :, 0] = ch2_u8
     rgb_input_img[:, :, 1] = ch2_u8
     rgb_input_img[:, :, 2] = ch2_u8
-    if mask is not None and len(np.unique(mask)) > 1 and bin_composite==False:
+    if mask is not None and len(np.unique(mask)) > 1:
         bin_mask = dx.binary_frame_mask(ch2_u8, mask)
         bin_mask = np.where(bin_mask == 1, True, False)
         if channel is not None:
             rgb_input_img[bin_mask > 0, channel] = 255
         else:
             rgb_input_img[bin_mask > 0, 2] = 255
-    elif bin_composite:
-        bf_mask = np.where(mask > 0, True, False)
-        rgb_input_img[bf_mask > 0, channel] = 255
     return rgb_input_img
 
 
+def gray_scale_3ch(input_gs_image):
+    input_gs_image = (input_gs_image / input_gs_image.max()) * 255
+    ch2_u8 = np.uint8(input_gs_image)
+    rgb_input_img = np.zeros((np.shape(ch2_u8)[0], np.shape(ch2_u8)[1], 3), dtype=np.uint8)
+    rgb_input_img[:, :, 0] = ch2_u8
+    rgb_input_img[:, :, 1] = ch2_u8
+    rgb_input_img[:, :, 2] = ch2_u8
+    return rgb_input_img
 
+def plot_composite_image(img,mask,alpha=0.2):
+    # apply colors to mask
+    mask = np.array(mask, dtype=np.int32)
+    mask_deci = (mask - np.min(mask)) / (np.max(mask) - np.min(mask))
+    cm = plt.get_cmap('gist_rainbow')
+    colored_image = cm(mask_deci)
+    colored_image = (colored_image[:, :, :3] * 255).astype(np.uint8)
+    #RGB pil image
+    img_mask = img_as_ubyte(colored_image)
+    im_mask_pil = Image.fromarray(img_mask).convert('RGB')
+    img_gs = img_as_ubyte(img)
+    im_pil = Image.fromarray(img_gs).convert('RGB')
+    im3 = Image.blend(im_pil, im_mask_pil, alpha)
+    fig_ch = px.imshow(im3, binary_string=True, binary_backend="jpg", width=500, height=500, title=fig_title,
+                       binary_compression_level=9).update_xaxes(showticklabels=False).update_yaxes(showticklabels=False)
+    fig_ch.update_layout(title_x=0.5)
+    return fig_ch
 

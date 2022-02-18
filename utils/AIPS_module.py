@@ -12,7 +12,6 @@ import skimage
 from skimage.transform import rescale, resize, downscale_local_mean
 from utils.display_and_xml import evaluate_image_output,test_image
 
-
 class AIPS:
     def __init__(self, Image_name=None, path=None, rmv_object_nuc=None, block_size=None, offset=None):
         self.Image_name = Image_name

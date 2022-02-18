@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "02-18-2022 reduce time using rescaling and change ROI to bin (which is not a good idea)"
+git commit -m "02-18-2022 before adding new display"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
@@ -38,7 +38,6 @@ from utils.Dash_functions import parse_contents
 from utils.controls import controls, controls_nuc, controls_cyto, upload_parm
 from utils import AIPS_functions as af
 from utils import AIPS_module as ai
-from utils import display_and_xml as dx
 #import xml.etree.ElementTree as xml
 
 PATH = pathlib.Path(__file__)
@@ -217,7 +216,7 @@ def update_bar2(bar_slider_zoom):
 def Updat_offset(set_n,bar_zoom,ch,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont):
     if au:
         ch_ = np.array(json.loads(ch))
-        med_nuc = np.median(ch_) / 100
+        med_nuc = np.median(ch_) / 400
         norm = np.random.normal(med_nuc, 0.001*bar_ind, 100)
         offset_pred = []
         for norm_ in norm:
@@ -225,7 +224,7 @@ def Updat_offset(set_n,bar_zoom,ch,au,offset_input,bar_ind,image_input,channel_s
                                                block_size=59, offset=norm_,
                                                block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4,
                                                rmv_object_cyto=0.99, rmv_object_cyto_small=0.9, remove_border=True)
-            nuc_s = AIPS_object.Nucleus_segmentation(ch_, inv=False)
+            nuc_s = AIPS_object.Nucleus_segmentation(ch_, inv=False,rescale_image=True)
             offset_pred = norm_
             len_table = len(nuc_s['tabale_init'])
             if len_table > 3:
@@ -290,7 +289,7 @@ def update_bar3(bar_slider_cyto_zoom):
 def Updat_offset_cyto(set_n,bar_zoom_cyto,ch2,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont):
     if au:
         ch2_ = np.array(json.loads(ch2))
-        med_nuc = np.median(ch2_) / 100
+        med_nuc = np.median(ch2_) / 400
         norm = np.random.normal(med_nuc, 0.001*bar_ind, 100)
         offset_pred = []
         for norm_ in norm:
@@ -298,7 +297,7 @@ def Updat_offset_cyto(set_n,bar_zoom_cyto,ch2,au,offset_input,bar_ind,image_inpu
                                                block_size=59, offset=norm_,
                                                block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4,
                                                rmv_object_cyto=0.99, rmv_object_cyto_small=0.9, remove_border=True)
-            nuc_s = AIPS_object.Nucleus_segmentation(ch2_, inv=False)
+            nuc_s = AIPS_object.Nucleus_segmentation(ch2_, inv=False,rescale_image=True)
             offset_pred = norm_
             len_table = len(nuc_s['tabale_init'])
             if len_table > 3:
@@ -363,13 +362,11 @@ def Parameters_initiation(nn,tab_input,ch,ch2, image,cont,channel,int_on_nuc,hig
     # try to work on img
     nmask2 = nuc_s['nmask2']
     nmask4 = nuc_s['nmask4']
-    sort_mask_bin = nuc_s['sort_mask_bin']
     sort_mask = nuc_s['sort_mask']
     table = nuc_s['table']
     cell_mask_1 = seg['cell_mask_1']
     combine = seg['combine']
     cseg_mask = seg['cseg_mask']
-    cseg_mask_bin = seg['cseg_mask_bin']
     info_table = seg['info_table']
     mask_unfiltered = seg['mask_unfiltered']
     table_unfiltered = seg['table_unfiltered']
@@ -442,11 +439,9 @@ def Parameters_initiation(nn,tab_input,ch,ch2, image,cont,channel,int_on_nuc,hig
         '''
            Nucleus segmentation 
         '''
-        im_pil_nmask2 = af.px_pil_figure(nmask2, bit=1, mask_name='nmask2', fig_title='Local threshold map - seed',
-                                         wh=500)
+        im_pil_nmask2 = af.px_pil_figure(nmask2, bit=1, mask_name='nmask2', fig_title='Local threshold map - seed',wh=500)
         # get overlay of seed and nuclei
-        sort_mask_bin = dx.outline_seg(sort_mask_bin,binary_img=True)
-        ch1_sort_mask = af.rgb_file_gray_scale(ch_, mask=sort_mask_bin, channel=0,bin_composite=True)
+        ch1_sort_mask = af.rgb_file_gray_scale(ch_, mask=sort_mask, channel=0)
         fig_im_pil_sort_mask = af.px_pil_figure(ch1_sort_mask, bit=3, mask_name='sort_mask', fig_title='RGB map - seed',wh=500)
         return [
             dbc.Row([
@@ -483,20 +478,23 @@ def Parameters_initiation(nn,tab_input,ch,ch2, image,cont,channel,int_on_nuc,hig
         '''
             Cytosol  segmentation 
         '''
-        sort_mask_bin = dx.outline_seg(sort_mask_bin, binary_img=True)
-        ch1_sort_mask = af.rgb_file_gray_scale(ch_, mask=sort_mask_bin, channel=0, bin_composite=True)
+        ch1_sort_mask = af.rgb_file_gray_scale(ch_, mask=sort_mask, channel=0)
         fig_im_pil_sort_mask = af.px_pil_figure(ch1_sort_mask, bit=3, mask_name='sort_mask', fig_title='RGB map - seed',
                                                 wh=500)
-        cell_mask_2 = np.where(cell_mask_1 > 0, True, False)
-        fig_im_pil_cell_mask_2 = af.px_pil_figure(cell_mask_2, bit=1, mask_name='_cell_mask',fig_title='Local threshold map - seed', wh=500)
+        cell_mask_2 = np.where(cell_mask_1 == 1, True, False)
+        combine = np.where(combine == 1, True, False)
+        fig_im_pil_cell_mask_2 = af.px_pil_figure(cell_mask_2, bit=1, mask_name='_cell_mask',
+                                                  fig_title='Local threshold map - seed', wh=500)
+        fig_im_pil_cell_combine = af.px_pil_figure(combine, bit=1, mask_name='_combine',
+                                                   fig_title='Local threshold map - seed', wh=500)
 
-        cseg_mask_bin = dx.outline_seg(cseg_mask_bin, binary_img=True)
-        ch2_cseg_mask = af.rgb_file_gray_scale(ch2_, mask=cseg_mask_bin, channel=0,bin_composite=True)
+        ch2_cseg_mask = af.rgb_file_gray_scale(ch2_, mask=cseg_mask, channel=0)
         fig_im_pil_cseg_mask = af.px_pil_figure(ch2_cseg_mask, bit=3, mask_name='_cseg',
                                                 fig_title='Mask - Target (filterd)', wh=500)
 
-        ch2_mask_unfiltered = af.rgb_file_gray_scale(ch2_, mask=mask_unfiltered, channel=0,bin_composite=True)
-        fig_im_pil_mask_unfiltered = af.px_pil_figure(mask_unfiltered, bit=3, mask_name='_csegg',fig_title='Mask - Target', wh=500)
+        ch2_mask_unfiltered = af.rgb_file_gray_scale(ch2_, mask=mask_unfiltered, channel=0)
+        fig_im_pil_mask_unfiltered = af.px_pil_figure(mask_unfiltered, bit=3, mask_name='_csegg',
+                                                      fig_title='Mask - Target', wh=500)
         len_unfiltered_table = table_unfiltered
         return [
             dbc.Row([
