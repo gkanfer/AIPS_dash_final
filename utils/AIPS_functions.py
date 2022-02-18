@@ -5,8 +5,10 @@ import xml.etree.ElementTree as xml
 import numpy as np
 from PIL import Image
 # from PIL import fromarray
+import plotly.express as px
 from skimage.filters import threshold_local
 from scipy.ndimage.morphology import binary_opening
+from skimage import io, filters, measure, color, img_as_ubyte
 import skimage.morphology as sm
 from skimage.segmentation import watershed
 from skimage import measure
@@ -17,7 +19,7 @@ from scipy.ndimage.morphology import binary_fill_holes
 import base64
 from datetime import datetime
 from utils.display_and_xml import unique_rand
-
+from utils import display_and_xml as dx
 
 def segmentation_2ch(ch,ch2, rmv_object_nuc, block_size, offset,int_nuc, cyto_seg,
                      block_size_cyto,int_cyto ,offset_cyto, global_ther, rmv_object_cyto, rmv_object_cyto_small):
@@ -131,10 +133,12 @@ def show_image_adjust(image, low_prec, up_prec):
     # PIL_scaled_ch1.show()
     # return PIL_scaled_ch1
 
-def save_pil_to_directory(img,bit,mask_name,output_dir = 'temp'):
+def px_pil_figure(img,bit,mask_name,fig_title,wh):
     '''
     :param img: image input
              bit:1 np.unit16 or 2 np.unit8
+             fig_title: title for display on dash
+             wh: width and hight in pixels
     :return: encoded_image (e_img)
     '''
     bit = str(img.dtype)
@@ -146,18 +150,11 @@ def save_pil_to_directory(img,bit,mask_name,output_dir = 'temp'):
         im_pil = Image.fromarray(np.uint16(img))
     else:
         # ROI mask
-        img = np.uint8(img)
-        roi_index_uni = np.unique(img)
-        roi_index_uni = roi_index_uni[roi_index_uni > 1]
-        sort_mask_buffer = np.ones((np.shape(img)[0], np.shape(img)[1], 3), dtype=np.uint8)
-        for npun in roi_index_uni:
-            for i in range(3):
-                sort_mask_buffer[img == npun, i] = unique_rand(2, 255, 1)[0]
-        im_pil = Image.fromarray(sort_mask_buffer, mode='RGB')
-    filename1 = datetime.now().strftime("%Y%m%d_%H%M%S" + mask_name)
-    im_pil.save(os.path.join(output_dir, filename1 + ".png"), format='png')  # this is for image processing
-    e_img = base64.b64encode(open(os.path.join('temp', filename1 + ".png"), 'rb').read())
-    return e_img
+        img_gs = img_as_ubyte(img)
+        im_pil = Image.fromarray(img_gs)
+    fig_ch = px.imshow(im_pil, binary_string=True, binary_backend="jpg", width=500, height=500,title=fig_title,binary_compression_level=9).update_xaxes(showticklabels=False).update_yaxes(showticklabels = False)
+    fig_ch.update_layout(title_x=0.5)
+    return fig_ch
 
 
 def XML_creat(filename,block_size,offset,rmv_object_nuc,block_size_cyto,offset_cyto,global_ther,rmv_object_cyto,rmv_object_cyto_small):
@@ -219,4 +216,35 @@ def seq(start, end, by=None, length_out=None):
     if abs(start + by * length_out - end) < eps:
         out.append(end)
     return out
+
+def rgb_file_gray_scale(input_gs_image,mask=None,channel=None,bin_composite=False):
+    ''' create a 3 channel rgb image from 16bit input image
+        optional bin countor image from ROI image
+        :parameter
+        input_gs_image: 16bit nparray
+        mask: 32int roi image
+        channel: 0,1,2 (rgb)
+        :return
+        3 channel stack file 8bit image
+    '''
+    input_gs_image = (input_gs_image / input_gs_image.max()) * 255
+    ch2_u8 = np.uint8(input_gs_image)
+    rgb_input_img = np.zeros((np.shape(ch2_u8)[0], np.shape(ch2_u8)[1], 3), dtype=np.uint8)
+    rgb_input_img[:, :, 0] = ch2_u8
+    rgb_input_img[:, :, 1] = ch2_u8
+    rgb_input_img[:, :, 2] = ch2_u8
+    if mask is not None and len(np.unique(mask)) > 1 and bin_composite==False:
+        bin_mask = dx.binary_frame_mask(ch2_u8, mask)
+        bin_mask = np.where(bin_mask == 1, True, False)
+        if channel is not None:
+            rgb_input_img[bin_mask > 0, channel] = 255
+        else:
+            rgb_input_img[bin_mask > 0, 2] = 255
+    elif bin_composite:
+        bf_mask = np.where(mask > 0, True, False)
+        rgb_input_img[bf_mask > 0, channel] = 255
+    return rgb_input_img
+
+
+
 

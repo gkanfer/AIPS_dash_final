@@ -73,9 +73,17 @@ def display_image_label(ch,mask,lable_draw, font_select,font_size):
         draw.text((info_table.iloc[i, 2].astype('int64'), info_table.iloc[i, 1].astype('int64')),str(info_table.iloc[i, sel_lable]), 'red', font=font)
     return info_table, PIL_image
 
-def outline_seg(mask,index):
-    seg_mask_temp = np.zeros(np.shape(mask), dtype=np.int32)
-    seg_mask_temp[mask == index] = index
+def outline_seg(mask,index=None,binary_img=False):
+    '''
+        binary_img= boolean
+        :return
+        counter of the border
+    '''
+    if binary_img:
+        seg_mask_temp=mask
+    else:
+        seg_mask_temp = np.zeros(np.shape(mask), dtype=np.int32)
+        seg_mask_temp[mask == index] = index
     seg_mask_eros_9 = binary_erosion(seg_mask_temp, structure=np.ones((9, 9))).astype(np.float64)
     seg_mask_eros_3 = binary_erosion(seg_mask_temp, structure=np.ones((3, 3))).astype(np.float64)
     framed_mask = seg_mask_eros_3 - seg_mask_eros_9

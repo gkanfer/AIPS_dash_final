@@ -8,10 +8,13 @@ from skimage import measure
 import os
 import pandas as pd
 from scipy.ndimage.morphology import binary_fill_holes
+import skimage
+from skimage.transform import rescale, resize, downscale_local_mean
 from utils.display_and_xml import evaluate_image_output,test_image
 
+
 class AIPS:
-    def __init__(self, Image_name, path, rmv_object_nuc, block_size, offset):
+    def __init__(self, Image_name=None, path=None, rmv_object_nuc=None, block_size=None, offset=None):
         self.Image_name = Image_name
         self.path = path
         self.rmv_object_nuc = rmv_object_nuc
@@ -50,7 +53,7 @@ class AIPS:
             l.append(name)
         return l
 
-    def Nucleus_segmentation(self,ch, inv=False, for_dash=False):
+    def Nucleus_segmentation(self,ch, inv=False, for_dash=False,rescale_image=False ):
         '''
         ch: Input image (tifffile image object)
         inv: if invert than no need to fill hall and open
@@ -58,12 +61,15 @@ class AIPS:
         block_size: Detect local edges 1-99 odd
         offset: Detect local edges 0.001-0.9 odd
         rmv_object_nuc: percentile of cells to remove, 0.01-0.99
+        rescale_image: boolean, fro reducing memory large images
         :return:
         nmask2: local threshold binary map (eg nucleus)
         nmask4: local threshold binary map post opening (eg nucleus)
         sort_mask: RGB segmented image output first channel for mask (eg nucleus)
         sort_mask_bin: Binary
         '''
+        if rescale_image:
+            ch = skimage.transform.rescale(ch, 0.25, anti_aliasing=False)
         nmask = threshold_local(ch, self.block_size, "mean", self.offset)
         blank = np.zeros(np.shape(ch))
         nmask2 = ch > nmask
@@ -100,6 +106,15 @@ class AIPS:
             sort_mask = blank.astype(int)
         if len(test_image(sort_mask_bin)) < 2:
             sort_mask_bin = blank.astype(int)
+        if rescale_image:
+            nmask2 = skimage.transform.resize(nmask2, (nmask2.shape[0] * 4, nmask2.shape[1] * 4),
+                                                   anti_aliasing=False, preserve_range=True)
+            nmask4 = skimage.transform.resize(nmask4, (nmask4.shape[0] * 4, nmask4.shape[1] * 4),
+                                                   anti_aliasing=False, preserve_range=True)
+            sort_mask = skimage.transform.resize(sort_mask, (sort_mask.shape[0] * 4, sort_mask.shape[1] * 4),
+                                                     anti_aliasing=False, preserve_range=True)
+            sort_mask_bin = skimage.transform.resize(sort_mask_bin, (sort_mask_bin.shape[0] * 4, sort_mask_bin.shape[1] * 4),
+                                            anti_aliasing=False, preserve_range=True)
         dict = {'nmask2':nmask2, 'nmask4':nmask4, 'sort_mask':sort_mask, 'sort_mask_bin':sort_mask_bin, 'tabale_init': table_init, 'table':test}
         return dict
 
@@ -118,7 +133,7 @@ class Segment_over_seed(AIPS):
     def test_subclass(self):
         print(self)
 
-    def Cytosol_segmentation(self, ch, ch2,sort_mask,sort_mask_bin):
+    def Cytosol_segmentation(self, ch, ch2,sort_mask,sort_mask_bin,rescale_image=False):
         '''
         ch: Input image (tifffile image object)
         ch2: Input image (tifffile image object)
@@ -130,6 +145,7 @@ class Segment_over_seed(AIPS):
         rmv_object_cyto:  percentile of cells to remove, 0.01-0.99
         rmv_object_cyto_small:  percentile of cells to remove, 0.01-0.99
         remove_border: boolean -  object on border of image to be removed
+        rescale_image: boolean, fro reducing memory large images
         :return:
         nmask2: local threshold binary map (eg nucleus)
         nmask4: local threshold binary map post opening (eg nucleus)
@@ -139,12 +155,17 @@ class Segment_over_seed(AIPS):
         sort_mask_syn: RGB segmented image output first channel for mask (eg nucleus) sync
         mask_unfiltered: Mask before filtering object size
         cseg_mask: RGB segmented image output first channel for mask (eg nucleus)
+        cseg_mask_bin: Binary mask
         test: Area table seed
         info_table: Area table cytosol synchronize
         table_unfiltered: Table before remove large and small objects
         '''
+        if rescale_image:
+            ch2 = skimage.transform.rescale(ch2, 0.25, anti_aliasing=False)
+            sort_mask_bin = skimage.transform.rescale(sort_mask_bin, 0.25, anti_aliasing=False)
+            sort_mask = skimage.transform.rescale(sort_mask, 0.25, anti_aliasing=False)
         ther_cell = threshold_local(ch2, self.block_size_cyto, "gaussian", self.offset_cyto)
-        blank = np.zeros(np.shape(ch))
+        blank = np.zeros(np.shape(ch2))
         cell_mask_1 = ch2 > ther_cell
         cell_mask_2 = binary_opening(cell_mask_1, structure=np.ones((3, 3))).astype(np.float64)
         quntile_num = np.quantile(ch2, self.global_ther)
@@ -226,11 +247,20 @@ class Segment_over_seed(AIPS):
         len_test2 = len(table_unfiltered.drop(test2.index))
         dict_object_table = {'Start':len_unfiltered,"remove large objects":len_test1,"remove small objects":len_test2}
         table_object_summary = pd.DataFrame(dict_object_table,index=[0])
+        # resize image for improving memory usage
+        if rescale_image:
+            cell_mask_2 = skimage.transform.resize(cell_mask_2, (cell_mask_2.shape[0] * 4, cell_mask_2.shape[1] * 4),anti_aliasing=False, preserve_range=True)
+            cell_mask_3 = skimage.transform.resize(cell_mask_3, (cell_mask_3.shape[0] * 4, cell_mask_3.shape[1] * 4),anti_aliasing=False, preserve_range=True)
+            combine_namsk = skimage.transform.resize(combine_namsk, (combine_namsk.shape[0] * 4, combine_namsk.shape[1] * 4),anti_aliasing=False, preserve_range=True)
+            cseg = skimage.transform.resize(cseg, (cseg.shape[0] * 4, cseg.shape[1] * 4),anti_aliasing=False, preserve_range=True)
+            cseg_mask = skimage.transform.resize(cseg_mask, (cseg_mask.shape[0] * 4, cseg_mask.shape[1] * 4),anti_aliasing=False, preserve_range=True)
+            cseg_mask_bin = skimage.transform.resize(cseg_mask_bin, (cseg_mask_bin.shape[0] * 4, cseg_mask_bin.shape[1] * 4),anti_aliasing=False, preserve_range=True)
+
         # check data frame
         if len(info_table)==0:
             d = {'area': [0], 'centroid-0': [0], 'centroid-1': [0], 'label': [0]}
             info_table = pd.DataFrame(d)
         else:
             info_table=info_table
-        dict = {'cell_mask_1': cell_mask_2,'combine': cell_mask_3,'sort_mask_sync':combine_namsk,'mask_unfiltered':cseg,'cseg_mask': cseg_mask,'info_table': info_table,'table_unfiltered':table_object_summary}
+        dict = {'cell_mask_1': cell_mask_2,'combine': cell_mask_3,'sort_mask_sync':combine_namsk,'mask_unfiltered':cseg,'cseg_mask': cseg_mask,'cseg_mask_bin':cseg_mask_bin,'info_table': info_table,'table_unfiltered':table_object_summary}
         return dict

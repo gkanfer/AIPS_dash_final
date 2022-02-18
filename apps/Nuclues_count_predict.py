@@ -81,64 +81,17 @@ def update_nuc(image,channel,high,low,bs,os,ron,bsc,osc,gt,roc,rocs):
         nuc_sel = '1'
         cyt_sel = '0'
     nuc_s = AIPS_object.Nucleus_segmentation(img[nuc_sel])
+    sort_mask = nuc_s['sort_mask']
     ch_ = img[nuc_sel]
     # segmentation traces the nucleus segmented image based on the
-    ch_ = (ch_ / ch_.max()) * 255
-    ch_ = np.uint8(ch_)
-    composite = np.zeros((np.shape(ch_)[0], np.shape(ch_)[1], 3), dtype=np.uint8)
-    composite[:, :, 0] = ch_
-    composite[:, :, 1] = ch_
-    composite[:, :, 2] = ch_
-    img = composite
-    bf_mask = dx.binary_frame_mask(composite, nuc_s['sort_mask'])
-    bf_mask = np.where(bf_mask == 1, True, False)
-    composite[bf_mask > 0, 1] = 255
-    label_array = nuc_s['sort_mask']
-    current_labels = np.unique(label_array)[np.nonzero(np.unique(label_array))]
-    prop_names = [
-        "label",
-        "area",
-        "perimeter",
-        "eccentricity",
-        "euler_number",
-        "mean_intensity",
-    ]
-    prop_table = measure.regionprops_table(
-        label_array, intensity_image=composite, properties=prop_names)
-    table = pd.DataFrame(prop_table)
-    # Format the Table columns
-    columns = [
-        {"name": label_name, "id": label_name, "selectable": True}
-        if precision is None
-        else {
-            "name": label_name,
-            "id": label_name,
-            "type": "numeric",
-            "selectable": True,
-        }
-        for label_name, precision in zip(prop_names, (None, None, 4, 4, None, 3))]
-    initial_columns = ["label", "area"]
-    #img = img_as_ubyte(color.gray2rgb(composite))
-    img = Image.fromarray(img)
-    label_array = np.pad(label_array, (1,), "constant", constant_values=(0,))
+    ch1_sort_mask = af.rgb_file_gray_scale(ch_, mask=sort_mask, channel=2)
+    fig_im_pil_sort_mask = af.px_pil_figure(ch1_sort_mask, bit=3, mask_name='sort_mask', fig_title='RGB map - seed', wh=700)
     return [
-         dbc.CardHeader(html.H2("Explore seed properties", style={'text-align': 'center'})),
-            dbc.CardBody(
-                dbc.Row(
-                    dbc.Col(
-                        dcc.Graph(
-                            id="graph",
-                            figure=image_with_contour(
-                                img,
-                                label_array,
-                                table,
-                                initial_columns,
-                                color_column="area",
-                            ),
-                        ),
-                    )
-                )
-            )]
-
+        dbc.Row([
+            dbc.Col(
+                dcc.Graph(
+                    id="Nuclues_pick",
+                    figure=fig_im_pil_sort_mask))
+            ])]
 
 

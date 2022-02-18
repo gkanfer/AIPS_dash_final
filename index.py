@@ -1,9 +1,10 @@
 '''
 git add .
-git commit -m "08-02-2022 main app - Picking cells completed"
+git commit -m "02-18-2022 reduce time using rescaling and change ROI to bin (which is not a good idea)"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
+import io
 from app import app
 from app import server
 from apps import Nuclues_count_predict, SVM_target_classification
@@ -25,40 +26,29 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageEnhance
 import base64
 import pandas as pd
+import plotly.express as px
 import re
 from random import randint
 from io import BytesIO
 from flask_caching import Cache
 from dash.long_callback import DiskcacheLongCallbackManager
+import pathlib
 
 from utils.Dash_functions import parse_contents
 from utils.controls import controls, controls_nuc, controls_cyto, upload_parm
 from utils import AIPS_functions as af
 from utils import AIPS_module as ai
+from utils import display_and_xml as dx
 #import xml.etree.ElementTree as xml
 
-
-UPLOAD_DIRECTORY = "app_uploaded_files"
+PATH = pathlib.Path(__file__)
+UPLOAD_DIRECTORY = PATH.joinpath("../app_uploaded_files").resolve()
 
 next_display = dbc.Button('Next', id='display-val', n_clicks=0, color="Primary", className="me-1", style={'padding': '10px 24px'})
 next_Nucleus = dbc.Button('Next', id='Nucleus-val', n_clicks=0, color="success", className="me-1", style={'padding': '10px 24px'})
 next_Cell = dbc.Button('Next', id='Cell-val', n_clicks=0,color="Danger", className="me-1", style={'padding': '10px 24px'})
 next_parameter = dbc.Button('Next', id='parameter-val', n_clicks=0, color="Info", className="me-1", style={'padding': '10px 24px'})
 next_module = dbc.Button('Next', id='module-val', n_clicks=0, color="Secondary", className="me-1", style={'padding': '10px 24px'})
-
-
-# loading jason
-class NumpyEncoder(json.JSONEncoder):
-    """ Special json encoder for numpy types """
-    def default(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        elif isinstance(obj, np.floating):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
-
 
 timeout = 10
 
@@ -122,7 +112,10 @@ app.layout = dbc.Container(
                             dcc.Tab(label="Select module for activation", id = "Module-tab-id", value="Module-tab",style={'color': 'black'},selected_style={'color': 'red'},disabled=False)
                     ]),
                 html.Div(id='run_content'),
+                dcc.Store(id='json_img_ch',data=None),
+                dcc.Store(id='json_img_ch2',data=None),
                 dcc.Store(id='offset_store',data=None),
+                dcc.Store(id='image_shape',data=None),
                 dcc.Store(id='offset_cyto_store',data=None),
                 dcc.Loading(html.Div(id='img-output'),type="circle",style={'height': '100%', 'width': '100%'}),
                 html.Div(id="test-image-name",hidden=True),
@@ -140,15 +133,17 @@ app.layout = dbc.Container(
     Output('offset_cyto_store', 'data'),
     Output('global_ther', 'value'),
     Output('rmv_object_cyto', 'value'),
-    Output('rmv_object_cyto_small', 'value')
+    Output('rmv_object_cyto_small', 'value'),
+    Output('set-val','n_clicks'),
+    Output('set-val-cyto','n_clicks'),
      ],
     [Input('submit-parameters', 'n_clicks'),
      State('upload-csv', 'filename'),
      State('upload-csv', 'contents')])
 def Load_image(n,pram,cont):
-    if n is None:
+    if n < 1:
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update,\
-               dash.no_update,dash.no_update, dash.no_update, dash.no_update
+               dash.no_update,dash.no_update, dash.no_update, dash.no_update,dash.no_update,dash.no_update
     parameters = parse_contents(cont,pram)
     channel = int(parameters['act_ch'][0])
     bs = parameters['block_size'][0]
@@ -159,22 +154,36 @@ def Load_image(n,pram,cont):
     gt = parameters['global_ther'][0]
     roc = parameters['rmv_object_cyto'][0]
     rocs = parameters['rmv_object_cyto_small'][0]
-    return channel,bs,os,ron,bsc,osc,gt,roc,rocs
+    set_nuc=1
+    set_cyt=1
+    return channel,bs,os,ron,bsc,osc,gt,roc,rocs,set_nuc,set_cyt
 
 
 @app.callback(
-    Output('run_content', 'children'),
+    [Output('run_content', 'children'),
+    Output('json_img_ch', 'data'),
+    Output('json_img_ch2', 'data')],
     [Input('submit-val', 'n_clicks'),
      State('upload-image', 'filename'),
-     State('upload-image', 'contents')])
-def Load_image(n,image,cont):
-    if n is None:
-        return dash.no_update
-    for name, data_a in zip(image, cont):
-        data = data_a.encode("utf8").split(b";base64,")[1]
-        with open(os.path.join(UPLOAD_DIRECTORY, name), "wb") as fp:
-            fp.write(base64.decodebytes(data))
-    return [html.Button('Run', id='run-val', n_clicks=0)]
+     State('upload-image', 'contents'),
+     Input('act_ch', 'value')])
+def Load_image(n,image,cont,channel_sel):
+    if n == 0:
+        return dash.no_update,dash.no_update,dash.no_update
+    content_string = cont[0].split('data:image/tiff;base64,')[1]
+    decoded = base64.b64decode(content_string)
+    pixels = tfi.imread(io.BytesIO(decoded))
+    pixels_float = pixels.astype('float64')
+    img = pixels_float / 65535.000
+    if channel_sel == 1:
+        ch_ = img[0,:,:]
+        ch2_ = img[1,:,:]
+    else:
+        ch_ = img[1,:,:]
+        ch2_ = img[0,:,:]
+    json_object_img_ch = json.dumps(ch_.tolist())
+    json_object_img_ch2 = json.dumps(ch2_.tolist())
+    return [html.Button('Run', id='run-val', n_clicks=0)],json_object_img_ch,json_object_img_ch2
 
 @app.callback(Output('graduated-bar', 'value'),
               Input('graduated-bar-slider', 'value'))
@@ -195,24 +204,20 @@ def update_bar2(bar_slider_zoom):
      Output('offset', 'step')],
     [Input('set-val','n_clicks'),
     Input('graduated-bar-slider-nuc-zoom', 'value'),
+    State('json_img_ch', 'data'),
      State('Auto-nuc', 'on'),
      State('offset', 'value'),
      State('graduated-bar-slider', 'value'),
      State('upload-image', 'filename'),
-     State('act_ch', 'value')])
-def Updat_offset(set_n,bar_zoom,au,offset_input,bar_ind,image_input,channel_sel):
+     State('act_ch', 'value'),
+     State('submit-parameters', 'n_clicks'),
+     State('upload-csv', 'filename'),
+     State('upload-csv', 'contents')
+     ])
+def Updat_offset(set_n,bar_zoom,ch,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont):
     if au:
-        AIPS_object = ai.Segment_over_seed(Image_name=image_input[0], path=UPLOAD_DIRECTORY, rmv_object_nuc=0.9, block_size=59,
-                                           offset=offset_input,block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4, rmv_object_cyto=0.99,
-                                           rmv_object_cyto_small=0.9, remove_border=True)
-        img = AIPS_object.load_image()
-        if channel_sel == 1:
-            nuc_sel = '0'
-            cyt_sel = '1'
-        else:
-            nuc_sel = '1'
-            cyt_sel = '0'
-        med_nuc = np.median(img[nuc_sel]) / 100
+        ch_ = np.array(json.loads(ch))
+        med_nuc = np.median(ch_) / 100
         norm = np.random.normal(med_nuc, 0.001*bar_ind, 100)
         offset_pred = []
         for norm_ in norm:
@@ -220,8 +225,7 @@ def Updat_offset(set_n,bar_zoom,au,offset_input,bar_ind,image_input,channel_sel)
                                                block_size=59, offset=norm_,
                                                block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4,
                                                rmv_object_cyto=0.99, rmv_object_cyto_small=0.9, remove_border=True)
-            img = AIPS_object.load_image()
-            nuc_s = AIPS_object.Nucleus_segmentation(img['0'], inv=False)
+            nuc_s = AIPS_object.Nucleus_segmentation(ch_, inv=False)
             offset_pred = norm_
             len_table = len(nuc_s['tabale_init'])
             if len_table > 3:
@@ -233,11 +237,21 @@ def Updat_offset(set_n,bar_zoom,au,offset_input,bar_ind,image_input,channel_sel)
         value_marks = {i: i for i in [min_val, max_val]}
         return [min_val, max_val, value_marks, offset_pred,steps]
     else:
-        min_val = 0.001
-        max_val = 0.8
-        value_marks = {i: i for i in [0.001, 0.8]}
-        offset_pred = offset_input
-        steps = 0.001
+        if n_parm > 0:
+            parameters = parse_contents(cont, pram)
+            os = parameters['offset'][0]
+            norm = np.random.normal(os, 0.001, 100)
+            min_val = round(np.min(norm), 4)
+            max_val = round(np.max(norm), 4)
+            steps = (np.max(os) - np.min(os)) / bar_zoom
+            value_marks = {i: i for i in [min_val, max_val]}
+            offset_pred = os
+        else:
+            min_val = 0.001
+            max_val = 0.8
+            value_marks = {i: i for i in [0.001, 0.8]}
+            offset_pred = offset_input
+            steps = 0.001
         return [min_val, max_val, value_marks, offset_pred,steps]
 
 '''
@@ -263,24 +277,20 @@ def update_bar3(bar_slider_cyto_zoom):
      Output('offset_cyto', 'step')],
     [Input('set-val-cyto','n_clicks'),
      Input('graduated-bar-slider-cyto-zoom', 'value'),
-     State('Auto-cyto', 'on'),
-     State('offset_cyto', 'value'),
-     State('graduated-bar-cyto', 'value'),
-     State('upload-image', 'filename'),
-     State('act_ch', 'value')])
-def Updat_offset_cyto(set_n,bar_zoom_cyto,au,offset_input,bar_ind,image_input,channel_sel):
+    State('json_img_ch2', 'data'),
+    State('Auto-cyto', 'on'),
+    State('offset_cyto', 'value'),
+    State('graduated-bar-cyto', 'value'),
+    State('upload-image', 'filename'),
+    State('act_ch', 'value'),
+    State('submit-parameters', 'n_clicks'),
+    State('upload-csv', 'filename'),
+    State('upload-csv', 'contents')
+     ])
+def Updat_offset_cyto(set_n,bar_zoom_cyto,ch2,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont):
     if au:
-        AIPS_object = ai.Segment_over_seed(Image_name=image_input[0], path=UPLOAD_DIRECTORY, rmv_object_nuc=0.9, block_size=59,
-                                           offset=offset_input,block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4, rmv_object_cyto=0.99,
-                                           rmv_object_cyto_small=0.9, remove_border=True)
-        img = AIPS_object.load_image()
-        if channel_sel == 1:
-            nuc_sel = '0'
-            cyt_sel = '1'
-        else:
-            nuc_sel = '1'
-            cyt_sel = '0'
-        med_nuc = np.median(img[nuc_sel]) / 100
+        ch2_ = np.array(json.loads(ch2))
+        med_nuc = np.median(ch2_) / 100
         norm = np.random.normal(med_nuc, 0.001*bar_ind, 100)
         offset_pred = []
         for norm_ in norm:
@@ -288,8 +298,7 @@ def Updat_offset_cyto(set_n,bar_zoom_cyto,au,offset_input,bar_ind,image_input,ch
                                                block_size=59, offset=norm_,
                                                block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4,
                                                rmv_object_cyto=0.99, rmv_object_cyto_small=0.9, remove_border=True)
-            img = AIPS_object.load_image()
-            nuc_s = AIPS_object.Nucleus_segmentation(img['0'], inv=False)
+            nuc_s = AIPS_object.Nucleus_segmentation(ch2_, inv=False)
             offset_pred = norm_
             len_table = len(nuc_s['tabale_init'])
             if len_table > 3:
@@ -301,17 +310,29 @@ def Updat_offset_cyto(set_n,bar_zoom_cyto,au,offset_input,bar_ind,image_input,ch
         value_marks = {i: i for i in [min_val, max_val]}
         return [min_val, max_val, value_marks, offset_pred,steps]
     else:
-        min_val = 0.001
-        max_val = 0.8
-        value_marks = {i: i for i in [0.001, 0.8]}
-        offset_pred = offset_input
-        steps = 0.001
+        if n_parm > 0:
+            parameters = parse_contents(cont, pram)
+            osc = parameters['offset_cyto'][0]
+            norm = np.random.normal(osc, 0.001, 100)
+            min_val = round(np.min(norm), 4)
+            max_val = round(np.max(norm), 4)
+            steps = (np.max(os) - np.min(os)) / bar_zoom_cyto
+            value_marks = {i: i for i in [min_val, max_val]}
+            offset_pred = os
+        else:
+            min_val = 0.001
+            max_val = 0.8
+            value_marks = {i: i for i in [0.001, 0.8]}
+            offset_pred = offset_input
+            steps = 0.001
         return [min_val, max_val, value_marks, offset_pred,steps]
 
 @app.callback(
     Output('img-output', 'children'),
     [Input('run-val', 'n_clicks'),
     Input('tabs', 'value'),
+    Input('json_img_ch', 'data'),
+    Input('json_img_ch2', 'data'),
     State('upload-image', 'filename'),
     State('upload-image', 'contents'),
     Input('act_ch', 'value'),
@@ -328,46 +349,41 @@ def Updat_offset_cyto(set_n,bar_zoom_cyto,au,offset_input,bar_ind,image_input,ch
     Input('rmv_object_cyto', 'value'),
     Input('rmv_object_cyto_small', 'value'),
      ])
-def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs,os,ron,bsc,int_on_cyto,osc,gt,roc,rocs):
-    AIPS_object = ai.Segment_over_seed(Image_name=str(image[0]), path=UPLOAD_DIRECTORY, rmv_object_nuc=ron,
+def Parameters_initiation(nn,tab_input,ch,ch2, image,cont,channel,int_on_nuc,high,low,bs,os,ron,bsc,int_on_cyto,osc,gt,roc,rocs):
+    AIPS_object = ai.Segment_over_seed(Image_name=image[0], path=UPLOAD_DIRECTORY,rmv_object_nuc=ron,
                                        block_size=bs,
                                        offset=os,
                                        block_size_cyto=bsc, offset_cyto=osc, global_ther=gt, rmv_object_cyto=roc,
                                        rmv_object_cyto_small=rocs, remove_border=False)
-    img = AIPS_object.load_image()
-    if channel==1:
-        nuc_sel='0'
-        cyt_sel='1'
-    else:
-        nuc_sel = '1'
-        cyt_sel = '0'
-    nuc_s = AIPS_object.Nucleus_segmentation(img[nuc_sel])
-    seg = AIPS_object.Cytosol_segmentation(img[nuc_sel],img[cyt_sel],nuc_s['sort_mask'],nuc_s['sort_mask_bin'])
+    ch_ = np.array(json.loads(ch))
+    ch2_ = np.array(json.loads(ch2))
+    nuc_s = AIPS_object.Nucleus_segmentation(ch_,rescale_image=True)
+    seg = AIPS_object.Cytosol_segmentation(ch_,ch2_,nuc_s['sort_mask'],nuc_s['sort_mask_bin'],rescale_image=True)
     # dict_ = {'img':img,'nuc':nuc_s,'seg':seg}
     # try to work on img
-    ch_ = img[nuc_sel]
-    ch2_ = img[cyt_sel]
     nmask2 = nuc_s['nmask2']
     nmask4 = nuc_s['nmask4']
+    sort_mask_bin = nuc_s['sort_mask_bin']
     sort_mask = nuc_s['sort_mask']
     table = nuc_s['table']
     cell_mask_1 = seg['cell_mask_1']
     combine = seg['combine']
     cseg_mask = seg['cseg_mask']
+    cseg_mask_bin = seg['cseg_mask_bin']
     info_table = seg['info_table']
     mask_unfiltered = seg['mask_unfiltered']
     table_unfiltered = seg['table_unfiltered']
     image_size_x = np.shape(ch_)[1]
     image_size_y = np.shape(ch2_)[1]
     try:
-        med_seed = int(np.median(seed_table))
-        len_seed = len(seed_table)
+        med_seed = int(np.median(table['area']))
+        len_seed = len(table)
     except:
         med_seed = 'None'
         len_seed = 'None'
     try:
-        med_cyto = int(np.median(cyto_table))
-        len_cyto = len(cyto_table)
+        med_cyto = int(np.median(info_table['area']))
+        len_cyto = len(info_table)
     except:
         med_cyto = 'None'
         len_cyto = 'None'
@@ -383,43 +399,24 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
     pix = af.show_image_adjust(ch_, low_prec=low, up_prec=high)
     pix = pix * 65535.000
     im_pil = Image.fromarray(np.uint16(pix))
-    im_pil.save("1.png", format='png')  # this is for image processing
-    encoded_image = base64.b64encode(open("1.png", 'rb').read())
+    fig_ch = px.imshow(im_pil, binary_string=True, binary_backend="jpg",width=500,height=500,title='Seed:'+ Channel_number_1,binary_compression_level=9).update_xaxes(showticklabels = False).update_yaxes(showticklabels = False)
+    fig_ch.update_layout(title_x=0.5)
     pix_2 = af.show_image_adjust(ch2_, low_prec=low, up_prec=high)
     pix_2 = pix_2 * 65535.000
     im_pil = Image.fromarray(np.uint16(pix_2))
-    im_pil.save("2.png", format='png')  # this is for image processing
-    encoded_image_ch2 = base64.b64encode(open("2.png", 'rb').read())
-    '''
-    Nucleus segmentation 
-    '''
-    encoded_image_nmask2 = af.save_pil_to_directory(nmask2, bit=1, mask_name='nmask2')
-    encoded_image_sort_mask = af.save_pil_to_directory(sort_mask, bit=3, mask_name='sort_mask')
-    '''
-    Cytosol  segmentation 
-    '''
-    cell_mask_2 = np.where(cell_mask_1 == 1, True, False)
-    combine = np.where(combine == 1, True, False)
-    encoded_image_cell_mask_2 = af.save_pil_to_directory(cell_mask_2, bit=1, mask_name='_cell_mask')
-    encoded_image_cell_combine = af.save_pil_to_directory(combine, bit=1, mask_name='_combine')
-    encoded_image_cseg_mask = af.save_pil_to_directory(cseg_mask, bit=3, mask_name='_cseg')
-    encoded_image_mask_unfiltered = af.save_pil_to_directory(mask_unfiltered, bit=3, mask_name='_csegg')
-    len_unfiltered_table = table_unfiltered
+    fig_ch2 = px.imshow(im_pil, binary_string=True, binary_backend="jpg",width=500,height=500,title='Target:'+ Channel_number_2,binary_compression_level=9).update_xaxes(showticklabels = False).update_yaxes(showticklabels = False)
+    fig_ch.update_layout(title_x=0.5)
     if tab_input == 'load_tab':
         return [
             dbc.Row([
-                dbc.Col([
                     dbc.Col(
-                    html.Label('Seed: ' + Channel_number_1, style={'text-align-last': 'center'})),
+                        dcc.Graph(
+                            id="graph_ch",
+                            figure=fig_ch), md=6),
                     dbc.Col(
-                    html.Img(id="img-load", src='data:image/png;base64,{}'.format(encoded_image.decode()),
-                             style={'width': '90%', 'height': 'auto'}))]),
-                dbc.Col([
-                    dbc.Col(
-                    html.Label('Target: ' + Channel_number_2, style={'text-align-last': 'center'})),
-                    dbc.Col(
-                    html.Img(id="img-load", src='data:image/png;base64,{}'.format(encoded_image_ch2.decode()),
-                             style={'width': '90%', 'height': 'auto'}))]),
+                        dcc.Graph(
+                            id="graph_ch2",
+                            figure=fig_ch2), md=6),
                     ]),
             html.Br(),
             html.Br(),
@@ -442,99 +439,114 @@ def Parameters_initiation(nn,tab_input,image,cont,channel,int_on_nuc,high,low,bs
                         next_Nucleus, width=3))
             ]
     elif tab_input == 'Nucleus-tab':
+        '''
+           Nucleus segmentation 
+        '''
+        im_pil_nmask2 = af.px_pil_figure(nmask2, bit=1, mask_name='nmask2', fig_title='Local threshold map - seed',
+                                         wh=500)
+        # get overlay of seed and nuclei
+        sort_mask_bin = dx.outline_seg(sort_mask_bin,binary_img=True)
+        ch1_sort_mask = af.rgb_file_gray_scale(ch_, mask=sort_mask_bin, channel=0,bin_composite=True)
+        fig_im_pil_sort_mask = af.px_pil_figure(ch1_sort_mask, bit=3, mask_name='sort_mask', fig_title='RGB map - seed',wh=500)
         return [
             dbc.Row([
-                dbc.Col([
-                    dbc.Col(html.Label('Seed Image', style={'text-align': 'right'})),
-                    dbc.Col(html.Img(id="img-output-orig", src='data:image/png;base64,{}'.format(encoded_image.decode()),
-                                     style={'width': '100%', 'height': 'auto'}, alt="re-adjust parameters", title="ORIG"))
-                             ]),
-                dbc.Col([
-                    dbc.Col(html.Label('Local threshold map - seed', style={'text-align': 'right'})),
-                    dbc.Col(html.Img(id="img-output-orig", src='data:image/png;base64,{}'.format(encoded_image_nmask2.decode()),
-                                     style={'width': '100%', 'height': 'auto'}, alt="re-adjust parameters", title="ORIG"))
-                                 ])
-                    ]),
-            dbc.Row([
-                dbc.Col([
-                dbc.Col(html.Label('RGB map - seed', style={'text-align': 'right'})),
                 dbc.Col(
-                    html.Img(id="img-output-orig", src='data:image/png;base64,{}'.format(encoded_image_sort_mask.decode()),
-                             style={'width': '50%', 'height': 'auto'}, alt="re-adjust parameters", title="ORIG"))
-                    ])
+                    dcc.Graph(
+                        id="graph_im_pil_nmask2",
+                        figure=im_pil_nmask2), md=6),
+                dbc.Col(
+                    dcc.Graph(
+                        id="graph_fig_im_pil_sort_mask",
+                        figure=fig_im_pil_sort_mask), md=6),
                     ]),
+            html.Br(),
+            html.Br(),
+            dbc.Col([
+                dbc.Row(html.Label('Image parameters:')),
+                html.P([
+                    dbc.Row(html.Label("Image size: {} x {}".format(image_size_x, image_size_y))),
+                    html.Br(),
+                    dbc.Row(html.Label('Seed Image parameters:')),
+                    html.P([
+                        dbc.Row(html.Label("Median object area: {}".format(med_seed))),
+                        dbc.Row(html.Label("Number of objects detected: {}".format(len_seed))), ]),
+                    dbc.Row(html.Label('Target Image Parameters :')),
+                    html.P([
+                        dbc.Row(html.Label("Median object area: {}".format(med_cyto))),
+                        dbc.Row(html.Label("Number of objects detected: {}".format(len_cyto)))]),
+                ])]),
             dbc.Row(
                 dbc.Col(
                     next_Cell, width=3))
                 ]
-
     elif tab_input == 'Cell-tab':
-        return [dbc.Row([
+        '''
+            Cytosol  segmentation 
+        '''
+        sort_mask_bin = dx.outline_seg(sort_mask_bin, binary_img=True)
+        ch1_sort_mask = af.rgb_file_gray_scale(ch_, mask=sort_mask_bin, channel=0, bin_composite=True)
+        fig_im_pil_sort_mask = af.px_pil_figure(ch1_sort_mask, bit=3, mask_name='sort_mask', fig_title='RGB map - seed',
+                                                wh=500)
+        cell_mask_2 = np.where(cell_mask_1 > 0, True, False)
+        fig_im_pil_cell_mask_2 = af.px_pil_figure(cell_mask_2, bit=1, mask_name='_cell_mask',fig_title='Local threshold map - seed', wh=500)
 
-                        dbc.Col([html.Label('Target image', style={'text-align': 'center'}),
-                        html.Br(),
-                        html.Img(id="img-output-orig-target",
-                                  src='data:image/png;base64,{}'.format(encoded_image_ch2.decode()),
-                                  style={'width': '100%', 'height': 'auto'},
-                                  alt="re-adjust parameters",
-                                  title="Local Threshold")]),
-                        dbc.Col([html.Label('Local threshold map - Target', style={'text-align': 'center'}),
-                        html.Br(),
-                        html.Img(id="img-output-mask-target",
-                                  src='data:image/png;base64,{}'.format(encoded_image_cell_mask_2.decode()),
-                                  style={'max-width': '100%', 'height': 'auto'},
-                                  alt="re-adjust parameters",
-                                  title='Local threshold map - Target')
-                         ])
+        cseg_mask_bin = dx.outline_seg(cseg_mask_bin, binary_img=True)
+        ch2_cseg_mask = af.rgb_file_gray_scale(ch2_, mask=cseg_mask_bin, channel=0,bin_composite=True)
+        fig_im_pil_cseg_mask = af.px_pil_figure(ch2_cseg_mask, bit=3, mask_name='_cseg',
+                                                fig_title='Mask - Target (filterd)', wh=500)
 
-                                        ]),
-                dbc.Row([
-                    dbc.Col([html.Label('Mask - Target', style={'text-align': 'center'}),
-                            html.Br(),
-                            html.Img(id="img-output-mask-target",
-                                          src='data:image/png;base64,{}'.format(encoded_image_mask_unfiltered.decode()),
-                                          style={'max-width': '100%', 'height': 'auto'},
-                                          alt="re-adjust parameters",
-                                          title='Global Threshold - Target')
-                                 ]),
-                    dbc.Col([html.Label('Mask - Target (filterd)', style={'text-align': 'center'}),
-                             html.Br(),
-                             html.Img(id="img-output-mask-target",
-                                      src='data:image/png;base64,{}'.format(encoded_image_cseg_mask.decode()),
-                                      style={'max-width': '100%', 'height': 'auto'},
-                                      alt="re-adjust parameters",
-                                      title='Local threshold map - seed')
-                             ])]),
-            html.Br(),
-            html.Br(),
+        ch2_mask_unfiltered = af.rgb_file_gray_scale(ch2_, mask=mask_unfiltered, channel=0,bin_composite=True)
+        fig_im_pil_mask_unfiltered = af.px_pil_figure(mask_unfiltered, bit=3, mask_name='_csegg',fig_title='Mask - Target', wh=500)
+        len_unfiltered_table = table_unfiltered
+        return [
             dbc.Row([
-                dbc.Accordion([
-                dbc.AccordionItem(
-                    title="Cytosole segmentation inspection", children=[
-                       dbc.Row(html.Label("Number of objects detected before filtering: {}".format(len_unfiltered_table.iloc[0,0]))),
-                        dbc.Row(html.Label("Number of objects - large filtered: {}".format(len_unfiltered_table.iloc[0, 1]))),
-                        dbc.Row(html.Label("Number of objects - Small filtered:: {}".format(len_unfiltered_table.iloc[0, 2])))
-                                                                        ]
-                                    )
-                                    ])
+                    dbc.Col(
+                        dcc.Graph(
+                            id="graph_fig_im_pil_sort_mask",
+                            figure=fig_im_pil_sort_mask), md=6),
+                    dbc.Col(
+                        dcc.Graph(
+                            id="graph_local_thershold",
+                            figure=fig_im_pil_cell_mask_2), md=6),
                         ]),
-            dbc.Row(
-                dbc.Col(
-                    next_parameter, width=3))
-                ]
-    elif tab_input == 'save-tab':
-            with open('parameters.csv', 'w') as fp:
-                pass
-            return [
-                    dbc.Row(html.P('Update the parameters.xml file from the parental folder:')),
-                    html.Br(),
-                    dbc.Row([
-                        html.Button("Update", id="btn_update"),
-                        html.Div(id='Progress',hidden=False)]),
+                dbc.Row([
+                    dbc.Col(
+                        dcc.Graph(
+                            id="Mask_Target_unfiltered",
+                            figure=fig_im_pil_mask_unfiltered), md=6),
+                    dbc.Col(
+                        dcc.Graph(
+                            id="Mask_Target",
+                            figure=fig_im_pil_cseg_mask), md=6),
+                        ]),
+                html.Br(),
+                html.Br(),
+                dbc.Row([
+                    dbc.Accordion([
+                    dbc.AccordionItem(
+                        title="Cytosole segmentation inspection", children=[
+                           dbc.Row(html.Label("Number of objects detected before filtering: {}".format(len_unfiltered_table.iloc[0,0]))),
+                            dbc.Row(html.Label("Number of objects - large filtered: {}".format(len_unfiltered_table.iloc[0, 1]))),
+                            dbc.Row(html.Label("Number of objects - Small filtered:: {}".format(len_unfiltered_table.iloc[0, 2])))
+                                ])
+                            ])]),
                 dbc.Row(
                     dbc.Col(
-                        next_module, width=3))
-                ]
+                        next_parameter, width=3))
+                    ]
+    elif tab_input == 'save-tab':
+        with open('parameters.csv', 'w') as fp:
+            pass
+        return [
+                dbc.Row(html.P('Update the parameters.xml file from the parental folder:')),
+                html.Br(),
+                dbc.Row([
+                    html.Button("Update", id="btn_update"),
+                    html.Div(id='Progress',hidden=False)]),
+            dbc.Row(
+                dbc.Col(
+                    next_module, width=3))
+            ]
     elif tab_input == "Module-tab":
         return [
             dbc.Accordion(
@@ -614,13 +626,14 @@ def Load_parameters_xml(nnn,channel,bs,os,ron,bsc,osc,gt,roc,rocs):
 @app.callback(Output('page-content', 'children'),
               [Input('url', 'pathname')])
 def display_page(pathname):
-    if pathname == '/apps/Nuclues_count_predict':
+    if pathname=='/':
+        return dash.no_update
+    elif pathname == '/apps/Nuclues_count_predict':
         return Nuclues_count_predict.layout
     elif pathname == '/apps/SVM_target_classification':
         return SVM_target_classification.layout
     else:
         return "No seed segment were detected, Readjust seed segmentation"
-
 
 
 @app.callback(Output('load_tab-id', 'disabled'),
