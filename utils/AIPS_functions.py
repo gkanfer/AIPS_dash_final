@@ -253,11 +253,11 @@ def gray_scale_3ch(input_gs_image):
     rgb_input_img[:, :, 2] = ch2_u8
     return rgb_input_img
 
-def plot_composite_image(img,mask,alpha=0.2):
+def plot_composite_image(img,mask,fig_title,alpha=0.2):
     # apply colors to mask
     mask = np.array(mask, dtype=np.int32)
     mask_deci = (mask - np.min(mask)) / (np.max(mask) - np.min(mask))
-    cm = plt.get_cmap('gist_rainbow')
+    cm = plt.get_cmap('CMRmap')
     colored_image = cm(mask_deci)
     colored_image = (colored_image[:, :, :3] * 255).astype(np.uint8)
     #RGB pil image

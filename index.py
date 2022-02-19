@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "02-18-2022 before adding new display"
+git commit -m "02-19-2022 before fixing display"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
@@ -356,14 +356,19 @@ def Parameters_initiation(nn,tab_input,ch,ch2, image,cont,channel,int_on_nuc,hig
                                        rmv_object_cyto_small=rocs, remove_border=False)
     ch_ = np.array(json.loads(ch))
     ch2_ = np.array(json.loads(ch2))
+    ch_3c = af.gray_scale_3ch(ch_)
+    ch2_3c = af.gray_scale_3ch(ch2_)
     nuc_s = AIPS_object.Nucleus_segmentation(ch_,rescale_image=True)
-    seg = AIPS_object.Cytosol_segmentation(ch_,ch2_,nuc_s['sort_mask'],nuc_s['sort_mask_bin'],rescale_image=True)
+    #seg = AIPS_object.Cytosol_segmentation(ch_, ch2_, nuc_s['sort_mask'], nuc_s['sort_mask_bin'], rescale_image=True)
     # dict_ = {'img':img,'nuc':nuc_s,'seg':seg}
     # try to work on img
     nmask2 = nuc_s['nmask2']
     nmask4 = nuc_s['nmask4']
     sort_mask = nuc_s['sort_mask']
+    sort_mask_bin = nuc_s['sort_mask_bin']
+    sort_mask_bin = np.array(sort_mask_bin, dtype=np.int8)
     table = nuc_s['table']
+    seg = AIPS_object.Cytosol_segmentation(ch_, ch2_, sort_mask, sort_mask_bin, rescale_image=True)
     cell_mask_1 = seg['cell_mask_1']
     combine = seg['combine']
     cseg_mask = seg['cseg_mask']
@@ -441,8 +446,7 @@ def Parameters_initiation(nn,tab_input,ch,ch2, image,cont,channel,int_on_nuc,hig
         '''
         im_pil_nmask2 = af.px_pil_figure(nmask2, bit=1, mask_name='nmask2', fig_title='Local threshold map - seed',wh=500)
         # get overlay of seed and nuclei
-        ch1_sort_mask = af.rgb_file_gray_scale(ch_, mask=sort_mask, channel=0)
-        fig_im_pil_sort_mask = af.px_pil_figure(ch1_sort_mask, bit=3, mask_name='sort_mask', fig_title='RGB map - seed',wh=500)
+        fig_im_pil_sort_mask = af.plot_composite_image(ch_3c, sort_mask, fig_title='RGB map - seed', alpha=0.2)
         return [
             dbc.Row([
                 dbc.Col(
@@ -478,23 +482,16 @@ def Parameters_initiation(nn,tab_input,ch,ch2, image,cont,channel,int_on_nuc,hig
         '''
             Cytosol  segmentation 
         '''
-        ch1_sort_mask = af.rgb_file_gray_scale(ch_, mask=sort_mask, channel=0)
-        fig_im_pil_sort_mask = af.px_pil_figure(ch1_sort_mask, bit=3, mask_name='sort_mask', fig_title='RGB map - seed',
-                                                wh=500)
-        cell_mask_2 = np.where(cell_mask_1 == 1, True, False)
-        combine = np.where(combine == 1, True, False)
-        fig_im_pil_cell_mask_2 = af.px_pil_figure(cell_mask_2, bit=1, mask_name='_cell_mask',
+        fig_im_pil_sort_mask = af.plot_composite_image(ch2_3c, sort_mask, fig_title='RGB map - seed', alpha=0.2)
+        fig_im_pil_cell_mask_2 = af.px_pil_figure(combine, bit=1, mask_name='_cell_mask',
                                                   fig_title='Local threshold map - seed', wh=500)
-        fig_im_pil_cell_combine = af.px_pil_figure(combine, bit=1, mask_name='_combine',
-                                                   fig_title='Local threshold map - seed', wh=500)
-
+        fig_im_pil_mask_unfiltered = af.plot_composite_image(ch2_3c, mask_unfiltered, fig_title='Mask - Target',alpha=0.2)
+        # binary_to_ROI (slower)
+        cseg_mask = np.array(cseg_mask, dtype=np.int32)
         ch2_cseg_mask = af.rgb_file_gray_scale(ch2_, mask=cseg_mask, channel=0)
         fig_im_pil_cseg_mask = af.px_pil_figure(ch2_cseg_mask, bit=3, mask_name='_cseg',
                                                 fig_title='Mask - Target (filterd)', wh=500)
 
-        ch2_mask_unfiltered = af.rgb_file_gray_scale(ch2_, mask=mask_unfiltered, channel=0)
-        fig_im_pil_mask_unfiltered = af.px_pil_figure(mask_unfiltered, bit=3, mask_name='_csegg',
-                                                      fig_title='Mask - Target', wh=500)
         len_unfiltered_table = table_unfiltered
         return [
             dbc.Row([

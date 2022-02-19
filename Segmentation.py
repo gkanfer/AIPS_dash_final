@@ -55,7 +55,7 @@ def plot_composite_image(img,mask,fig_title,alpha=0.2):
     # apply colors to mask
     mask = np.array(mask, dtype=np.int32)
     mask_deci = (mask - np.min(mask)) / (np.max(mask) - np.min(mask))
-    cm = plt.get_cmap('gist_rainbow')
+    cm = plt.get_cmap('CMRmap')
     colored_image = cm(mask_deci)
     colored_image = (colored_image[:, :, :3] * 255).astype(np.uint8)
     #RGB pil image
@@ -75,26 +75,86 @@ def plot_composite_image(img,mask,fig_title,alpha=0.2):
 path = '/Users/kanferg/Desktop/NIH_Youle/Python_projacts_general/dash/AIPS_Dash_Final/app_uploaded_files/'
 #Composite.tif10.tif
 AIPS_object = ai.Segment_over_seed(Image_name='dmsot0273_0003-512.tif', path=path, rmv_object_nuc=0.5, block_size=83,
-                                           offset=0.00001,block_size_cyto=11, offset_cyto=-0.0003, global_ther=0.4, rmv_object_cyto=0.99,
-                                           rmv_object_cyto_small=0.9, remove_border=False)
+                                           offset=0.00001,block_size_cyto=17, offset_cyto=-0.004, global_ther=0.4, rmv_object_cyto=0.7,
+                                           rmv_object_cyto_small=0.1, remove_border=True)
 img = AIPS_object.load_image()
 ch = img['1']
 ch2 = img['0']
 
 nuc_s = AIPS_object.Nucleus_segmentation(img['1'], inv=False, for_dash=False,rescale_image=True )
-seg = AIPS_object.Cytosol_segmentation(ch, ch2, nuc_s['sort_mask'], nuc_s['sort_mask_bin'], rescale_image=True)
+seg = AIPS_object.Cytosol_segmentation(ch, ch2, nuc_s['sort_mask'], nuc_s['sort_mask_bin'], rescale_image=False)
 # dict_ = {'img':img,'nuc':nuc_s,'seg':seg}
 # try to work on img
 nmask2 = nuc_s['nmask2']
 nmask4 = nuc_s['nmask4']
 sort_mask_bin = nuc_s['sort_mask_bin']
+sort_mask_bin = skimage.transform.rescale(sort_mask_bin, 0.25, anti_aliasing=False)
+sort_mask_bin = np.where(sort_mask_bin > 0, 1, 0)
+sort_mask_bin = binary_erosion(sort_mask_bin, structure=np.ones((3, 3))).astype(np.float64)
+print(np.unique(sort_mask_bin))
+plt.imshow(sort_mask_bin)
 sort_mask = nuc_s['sort_mask']
+sort_mask = skimage.transform.rescale(sort_mask, 0.25, anti_aliasing=False)
+x = np.where(sort_mask_bin > 0,sort_mask,0)
+sort_mask = np.where(np.mod(x,1)>0,0,x)
+sort_mask = np.array(sort_mask,np.uint32)
+np.unique(sort_mask)
+plt.imshow(sort_mask)
+
+sort_mask = nuc_s['sort_mask']
+sort_mask = np.where(np.mod(sort_mask,1)>0,0,sort_mask)
+plt.imshow(sort_mask)
+
+sort_mask = np.array(sort_mask,np.int)
+np.unique(sort_mask)
+plt.imshow(sort_mask)
+
+
+x = np.array([1,1.2,3])
+y = np.where(np.mod(x,1)>0,0,x)
+
+sort_mask_bin_8 = np.array(sort_mask_bin, dtype=np.ubyte)
+np.unique(sort_mask_bin_8)
+plt.imshow(sort_mask_bin)
+plt.imshow(sort_mask_bin_8)
+sort_mask_bin_small = skimage.transform.rescale(sort_mask_bin, 0.25, anti_aliasing=False)
+sort_mask_bin_small = np.where(sort_mask_bin_small > 0 ,1,0)
+plt.imshow(sort_mask_bin_small)
+
+
+plt.imshow(sort_mask)
+np.unique(sort_mask)
+sort_mask_small = skimage.transform.rescale(sort_mask, 0.25, anti_aliasing=False)
+sort_mask_small = np.array(sort_mask_small, dtype=np.uint32)
+plt.imshow(sort_mask_small)
+
+
+#plt.imshow(sort_mask)
+np.unique(sort_mask)
+
+
+np.unique(sort_mask_bin)
+
+np.ones_like(sort_mask)
+sort_mask = np.array(sort_mask, dtype=np.uint8)
+sort_mask_bin = np.array(sort_mask_bin, dtype=np.uint8)
+np.unique(sort_mask)
+np.unique(sort_mask_bin)
+
+seg = AIPS_object.Cytosol_segmentation(ch, ch2, sort_mask, sort_mask_bin, rescale_image=True)
+
 table = nuc_s['table']
 cell_mask_1 = seg['cell_mask_1']
 combine = seg['combine']
 cseg_mask = seg['cseg_mask']
+np.unique(cseg_mask)
+plt.imshow(cseg_mask)
+np.unique(cell_mask_1)
 cseg_mask_bin = seg['cseg_mask_bin']
 info_table = seg['info_table']
+mask_unfiltered = seg['mask_unfiltered']
+plt.imshow(mask_unfiltered)
+
 
 input_gs_image = (ch / ch.max()) * 255
 ch2_u8 = np.uint8(input_gs_image)
@@ -104,10 +164,10 @@ rgb_input_img[:, :, 1] = ch2_u8
 rgb_input_img[:, :, 2] = ch2_u8
 
 
-
-a = plot_composite_image(rgb_input_img,sort_mask,'test',alpha=0.2)
+plt.imshow(mask_unfiltered)
+a = plot_composite_image(rgb_input_img,mask_unfiltered,'test',alpha=0.2)
 a.show()
-im_pil_nmask2 = af.px_pil_figure(nmask2, bit=1, mask_name='nmask2', fig_title='Local threshold map - seed',wh=500)
+im_pil_nmask2 = af.px_pil_figure(mask_unfiltered, bit=1, mask_name='nmask2', fig_title='Local threshold map - seed',wh=500)
 im_pil_nmask2.show()
 
 from PIL import Image

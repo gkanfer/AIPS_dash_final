@@ -1,7 +1,7 @@
 import tifffile as tfi
 import numpy as np
 from skimage.filters import threshold_local
-from scipy.ndimage.morphology import binary_opening
+from scipy.ndimage.morphology import binary_opening,binary_erosion
 import skimage.morphology as sm
 from skimage.segmentation import watershed
 from skimage import measure
@@ -162,7 +162,12 @@ class Segment_over_seed(AIPS):
         if rescale_image:
             ch2 = skimage.transform.rescale(ch2, 0.25, anti_aliasing=False)
             sort_mask_bin = skimage.transform.rescale(sort_mask_bin, 0.25, anti_aliasing=False)
+            sort_mask_bin = np.where(sort_mask_bin > 0, 1, 0)
+            sort_mask_bin = binary_erosion(sort_mask_bin, structure=np.ones((3, 3))).astype(np.float64)
             sort_mask = skimage.transform.rescale(sort_mask, 0.25, anti_aliasing=False)
+            sort_mask_ = np.where(sort_mask_bin > 0, sort_mask, 0)
+            sort_mask = np.where(np.mod(sort_mask_, 1) > 0, 0, sort_mask_)
+            sort_mask = np.array(sort_mask, np.uint32)
         ther_cell = threshold_local(ch2, self.block_size_cyto, "gaussian", self.offset_cyto)
         blank = np.zeros(np.shape(ch2))
         cell_mask_1 = ch2 > ther_cell
