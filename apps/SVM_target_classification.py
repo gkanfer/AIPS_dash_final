@@ -161,21 +161,25 @@ def Generate_segmentation_and_table(image,channel,bs,os,osd,ron,bsc,osc,oscd,gt,
         cyt_sel = '0'
     ch = img[nuc_sel]
     ch2 = img[cyt_sel]
-    nuc_s = AIPS_object.Nucleus_segmentation(img[nuc_sel])
-    seg = AIPS_object.Cytosol_segmentation(ch, ch2, nuc_s['sort_mask'], nuc_s['sort_mask_bin'])
+    nuc_s = AIPS_object.Nucleus_segmentation(img[nuc_sel],rescale_image=True)
+    seg = AIPS_object.Cytosol_segmentation(ch, ch2, nuc_s['sort_mask'], nuc_s['sort_mask_bin'],rescale_image=True)
     # segmentation traces the nucleus segmented image based on the
     ch2 = (ch2 / ch2.max()) * 255
     ch2_u8 = np.uint8(ch2)
-    bf_mask = dx.binary_frame_mask(ch2_u8, seg['sort_mask_sync'])
+    # ROI to 32bit
+    sort_mask_sync = seg['sort_mask_sync']
+    sort_mask_sync = np.array(sort_mask_sync, dtype=np.int32)
+    cseg_mask = seg['cseg_mask']
+    cseg_mask = np.array(cseg_mask, dtype=np.int32)
+    bf_mask = dx.binary_frame_mask(ch2_u8, sort_mask_sync)
     bf_mask = np.where(bf_mask == 1, True, False)
-    c_mask = dx.binary_frame_mask(ch2_u8, seg['cseg_mask'])
+    c_mask = dx.binary_frame_mask(ch2_u8, cseg_mask)
     c_mask = np.where(c_mask == 1, True, False)
     rgb_input_img = np.zeros((np.shape(ch2_u8)[0], np.shape(ch2_u8)[1], 3), dtype=np.uint8)
     rgb_input_img[:, :, 0] = ch2_u8
     rgb_input_img[:, :, 1] = ch2_u8
     rgb_input_img[:, :, 2] = ch2_u8
     rgb_input_img[bf_mask > 0, 2] = 255 # 3d grayscale array where green channel is for seed segmentation
-    cseg_mask = seg['cseg_mask']
     #label_array = nuc_s['sort_mask']
     prop_names = [
         "label",

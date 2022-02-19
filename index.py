@@ -1,6 +1,6 @@
 '''
 git add .
-git commit -m "02-19-2022 before fixing display"
+git commit -m "02-19-2022 fix svm cell selection"
 ##git push origin -u AIPS_dash_final
 git push origin main
 '''
