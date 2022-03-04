@@ -1,8 +1,10 @@
 '''
+# update branch
 git add .
-git commit -m "03-03-2022 break_images not working well"
-##git push origin -u AIPS_dash_final
-git push origin main
+git commit -m "03-04-2022 using pattern match for showing image slices"
+git branch -m server
+git push origin -u server
+
 '''
 import dash_labs as dl
 import json
