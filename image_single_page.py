@@ -127,8 +127,10 @@ def Load_image(n,image,cont,channel_sel,react):
     Input('json_img_ch2', 'data'),
     State('image_data_holder', 'children')])
 def image_chanked(ch,ch2,children):
-    H = ch.shape[0]//2
-    W = ch.shape[1]//2
+    ch = np.array(ch)
+    ch2 = np.array(ch2)
+    H = np.shape(ch)[0]//2
+    W = np.shape(ch)[1]//2
     tiles = [ch[x:x + H, y:y + W] for x in range(0, ch.shape[0], H) for y in range(0, ch.shape[1], W)]
     new_store = dcc.Store(id = {'type':'store_obj',
                                 'index':1},
@@ -137,69 +139,75 @@ def image_chanked(ch,ch2,children):
     return children
 
 @app.callback(
-    Output('image_display_holder', 'children'),
+    Output('img-output', 'children'),
     Input({'type': 'store_obj', 'index': ALL}, 'data')
 )
 def display_output(data):
     ll = []
-    for i in len(data):
+    count = 0
+    for slice in data:
+        count += 1
+        temp_arr = np.array(slice)
+        pix_2 = temp_arr * 65535.000
+        im_pil = Image.fromarray(np.uint16(pix_2))
+        fig_ch2 = px.imshow(im_pil, binary_string=True, binary_backend="jpg", width=500, height=500, title='Target:',
+                            binary_compression_level=9).update_xaxes(showticklabels=False).update_yaxes(
+            showticklabels=False)
+        ll.append(fig_ch2)
+    return [html.Div(children=[
+                dbc.Col([dcc.Graph(id='slice_disp'+str(fig['layout']['title']['text']),figure=fig)]) for fig in ll
+                        ],
+                    )]
 
-        ll.append(data[i])
-    return
-    [html.Div(children=[
-            dcc.Graph(id='slice_disp'+str(z),figure={}) for z in len(ll)
-                    ],
-                )]
 
 
-
-
-
-@app.callback(
-    Output('img-output', 'children'),
-    [Input('run-val', 'n_clicks'),
-    Input('json_img_ch', 'data'),
-    Input('json_img_ch2', 'data'),
-    State('upload-image', 'filename'),
-    State('upload-image', 'contents'),
-    Input('act_ch', 'value'),
-    State('Auto-nuc', 'value'),
-    Input('high_pass', 'value'),
-    Input('low_pass', 'value'),
-    Input('block_size','value'),
-    Input('offset','value'),
-    Input('rmv_object_nuc','value'),
-    Input('block_size_cyto', 'value'),
-    State('Auto-cyto', 'value'),
-    Input('offset_cyto', 'value'),
-    Input('global_ther', 'value'),
-    Input('rmv_object_cyto', 'value'),
-    Input('rmv_object_cyto_small', 'value'),
-    Input('graduated-bar-slider-memory-scale','value'),
-     ])
-def Parameters_initiation(nn,ch,ch2, image,cont,channel,int_on_nuc,high,low,bs,os,ron,bsc,int_on_cyto,osc,gt,roc,rocs,memory_reduction):
-    ch_ = np.array(ch)
-    ch2_ = np.array(ch2)
-    pix = ch_ * 65535.000
-    im_pil = Image.fromarray(np.uint16(pix))
-    fig_ch = px.imshow(im_pil, binary_string=True, binary_backend="jpg",width=500,height=500,title='Seed:',binary_compression_level=9).update_xaxes(showticklabels = False).update_yaxes(showticklabels = False)
-    fig_ch.update_layout(title_x=0.5,dragmode="drawrect")
-    pix_2 = ch2_ * 65535.000
-    im_pil = Image.fromarray(np.uint16(pix_2))
-    fig_ch2 = px.imshow(im_pil, binary_string=True, binary_backend="jpg",width=500,height=500,title='Target:',binary_compression_level=9).update_xaxes(showticklabels = False).update_yaxes(showticklabels = False)
-    fig_ch2.update_layout(title_x=0.5,dragmode="drawrect")
-    return [
-            dbc.Row([
-                    dbc.Col(
-                        dcc.Graph(
-                            id="graph_ch",
-                            figure=fig_ch), md=6),
-                    dbc.Col(
-                        dcc.Graph(
-                            id="graph_ch2",
-                            figure=fig_ch2), md=6),
-                    ]),
-            ]
+#
+#
+# @app.callback(
+#     Output('img-output', 'children'),
+#     [Input('run-val', 'n_clicks'),
+#     Input('json_img_ch', 'data'),
+#     Input('json_img_ch2', 'data'),
+#     State('upload-image', 'filename'),
+#     State('upload-image', 'contents'),
+#     Input('act_ch', 'value'),
+#     State('Auto-nuc', 'value'),
+#     Input('high_pass', 'value'),
+#     Input('low_pass', 'value'),
+#     Input('block_size','value'),
+#     Input('offset','value'),
+#     Input('rmv_object_nuc','value'),
+#     Input('block_size_cyto', 'value'),
+#     State('Auto-cyto', 'value'),
+#     Input('offset_cyto', 'value'),
+#     Input('global_ther', 'value'),
+#     Input('rmv_object_cyto', 'value'),
+#     Input('rmv_object_cyto_small', 'value'),
+#     Input('graduated-bar-slider-memory-scale','value'),
+#      ])
+# def Parameters_initiation(nn,ch,ch2, image,cont,channel,int_on_nuc,high,low,bs,os,ron,bsc,int_on_cyto,osc,gt,roc,rocs,memory_reduction):
+#     ch_ = np.array(ch)
+#     ch2_ = np.array(ch2)
+#     pix = ch_ * 65535.000
+#     im_pil = Image.fromarray(np.uint16(pix))
+#     fig_ch = px.imshow(im_pil, binary_string=True, binary_backend="jpg",width=500,height=500,title='Seed:',binary_compression_level=9).update_xaxes(showticklabels = False).update_yaxes(showticklabels = False)
+#     fig_ch.update_layout(title_x=0.5,dragmode="drawrect")
+#     pix_2 = ch2_ * 65535.000
+#     im_pil = Image.fromarray(np.uint16(pix_2))
+#     fig_ch2 = px.imshow(im_pil, binary_string=True, binary_backend="jpg",width=500,height=500,title='Target:',binary_compression_level=9).update_xaxes(showticklabels = False).update_yaxes(showticklabels = False)
+#     fig_ch2.update_layout(title_x=0.5,dragmode="drawrect")
+#     return [
+#             dbc.Row([
+#                     dbc.Col(
+#                         dcc.Graph(
+#                             id="graph_ch",
+#                             figure=fig_ch), md=6),
+#                     dbc.Col(
+#                         dcc.Graph(
+#                             id="graph_ch2",
+#                             figure=fig_ch2), md=6),
+#                     ]),
+#             ]
 
 if __name__ == "__main__":
     app.run_server()

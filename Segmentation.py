@@ -92,8 +92,10 @@ fig_ch2 = px.imshow(im_pil, binary_string=True, binary_backend="jpg",width=500,h
 fig_ch3 = px.imshow(im_pil, binary_string=True, binary_backend="jpg",width=500,height=500,title='Target:',binary_compression_level=9).update_xaxes(showticklabels = False).update_yaxes(showticklabels = False)
 ll = [fig_ch2]
 ll.append(fig_ch3)
+ll.index
 ll[0].show()
-
+ll[0]['layout']['title']['text']
+ll[0].layout.Title
 
 nuc_s = AIP
 S_object.Nucleus_segmentation(img['1'], inv=False, for_dash=False,rescale_image=True )

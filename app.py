@@ -1,7 +1,7 @@
 '''
 # update branch
 git add .
-git commit -m "03-04-2022 using pattern match for showing image slices"
+git commit -m "03-04-2022 image displayed but over try pattern match"
 git branch -m server
 git push origin -u server
 
