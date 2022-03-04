@@ -121,6 +121,7 @@ def Load_image(n,image,cont,channel_sel,react):
     return [html.Button('Run', id='run-val', n_clicks=0)],json_object_img_ch,json_object_img_ch2
 
 
+
 @app.callback(
     Output('image_data_holder', 'children'),
     [Input('json_img_ch', 'data'),
@@ -132,11 +133,15 @@ def image_chanked(ch,ch2,children):
     H = np.shape(ch)[0]//2
     W = np.shape(ch)[1]//2
     tiles = [ch[x:x + H, y:y + W] for x in range(0, ch.shape[0], H) for y in range(0, ch.shape[1], W)]
-    new_store = dcc.Store(id = {'type':'store_obj',
-                                'index':1},
-                          data=tiles[0])
-    children.append(new_store)
+    count = 0
+    for tile in tiles:
+        count += 1
+        new_store = dcc.Store(id = {'type':'store_obj',
+                                    'index':count},
+                              data=tile)
+        children.append(new_store)
     return children
+
 
 @app.callback(
     Output('img-output', 'children'),
@@ -150,14 +155,67 @@ def display_output(data):
         temp_arr = np.array(slice)
         pix_2 = temp_arr * 65535.000
         im_pil = Image.fromarray(np.uint16(pix_2))
-        fig_ch2 = px.imshow(im_pil, binary_string=True, binary_backend="jpg", width=500, height=500, title='Target:',
+        fig_ch2 = px.imshow(im_pil, binary_string=True, binary_backend="jpg", width=250, height=250, title=str(count),
                             binary_compression_level=9).update_xaxes(showticklabels=False).update_yaxes(
-            showticklabels=False)
+                            showticklabels=False)
         ll.append(fig_ch2)
     return [html.Div(children=[
-                dbc.Col([dcc.Graph(id='slice_disp'+str(fig['layout']['title']['text']),figure=fig)]) for fig in ll
+                dbc.Row([
+                    dbc.Col(
+                    dcc.Graph(id='slice_disp'+str(fig['layout']['title']['text']),figure=fig))
+                    for fig in ll ])
                         ],
-                    )]
+                    ) ]
+
+
+
+
+
+
+
+
+#
+# @app.callback(
+#     Output('image_data_holder', 'children'),
+#     [Input('json_img_ch', 'data'),
+#     Input('json_img_ch2', 'data'),
+#     State('image_data_holder', 'children')])
+# def image_chanked(ch,ch2,children):
+#     ch = np.array(ch)
+#     ch2 = np.array(ch2)
+#     H = np.shape(ch)[0]//2
+#     W = np.shape(ch)[1]//2
+#     tiles = [ch[x:x + H, y:y + W] for x in range(0, ch.shape[0], H) for y in range(0, ch.shape[1], W)]
+#     new_store = dcc.Store(id = {'type':'store_obj',
+#                                 'index':1},
+#                           data=tiles[0])
+#     children.append(new_store)
+#     return children
+#
+#
+#
+#
+#
+# @app.callback(
+#     Output('img-output', 'children'),
+#     Input({'type': 'store_obj', 'index': ALL}, 'data')
+# )
+# def display_output(data):
+#     ll = []
+#     count = 0
+#     for slice in data:
+#         count += 1
+#         temp_arr = np.array(slice)
+#         pix_2 = temp_arr * 65535.000
+#         im_pil = Image.fromarray(np.uint16(pix_2))
+#         fig_ch2 = px.imshow(im_pil, binary_string=True, binary_backend="jpg", width=500, height=500, title=str(count),
+#                             binary_compression_level=9).update_xaxes(showticklabels=False).update_yaxes(
+#                             showticklabels=False)
+#         ll.append(fig_ch2)
+#     return [html.Div(children=[
+#                 dbc.Col([dcc.Graph(id='slice_disp'+str(fig['layout']['title']['text']),figure=fig)])
+#                         ],
+#                     ) for fig in ll]
 
 
 
