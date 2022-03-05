@@ -1,7 +1,7 @@
 '''
 # update branch
 git add .
-git commit -m "03-04-2022 image displayed works"
+git commit -m "03-05-2022 svm serverside works good - now test multi image display"
 git branch -m server
 git push origin -u server
 
@@ -227,7 +227,7 @@ def update_bar2(bar_slider_zoom):
 def Updat_offset(set_n,bar_zoom,ch,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont,memory_reduction):
     if au:
         memory_index = {1: [0.25, 4], 2: [0.125, 8], 3: [0.062516, 16], 4: [0.031258, 32]}
-        ch_ = np.array(json.loads(ch))
+        ch_ = np.array(ch)
         med_nuc = np.median(ch_) / 400
         norm = np.random.normal(med_nuc, 0.001*bar_ind, 100)
         offset_pred = []
@@ -302,7 +302,7 @@ def update_bar3(bar_slider_cyto_zoom):
 def Updat_offset_cyto(set_n,bar_zoom_cyto,ch2,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont,memory_reduction):
     if au:
         memory_index = {1: [0.25, 4], 2: [0.125, 8], 3: [0.062516, 16], 4: [0.031258, 32]}
-        ch2_ = np.array(json.loads(ch2))
+        ch2_ = np.array(ch2)
         med_nuc = np.median(ch2_) / 400
         norm = np.random.normal(med_nuc, 0.001*bar_ind, 100)
         offset_pred = []
@@ -342,3 +342,4 @@ def Updat_offset_cyto(set_n,bar_zoom_cyto,ch2,au,offset_input,bar_ind,image_inpu
 
 if __name__ == "__main__":
     app.run_server()
+    #app.run_server(debug=True)

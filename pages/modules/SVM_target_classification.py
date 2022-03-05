@@ -76,49 +76,31 @@ layout = html.Div(
 
 @callback(
     [Output('target', 'style'),
-     Output('control', 'style'),
+    Output('control', 'style'),
     Output('target', 'size'),
-     Output('control', 'size'),
-     Output('json_label_state','data')],
+    Output('control', 'size'),
+    Output('json_label_state','data')],
     [Input('target', 'n_clicks'),
     Input('control', 'n_clicks')])
 def displayClick(targt_btn, ctrl_btn):
     if targt_btn and ctrl_btn is None:
         return dash.no_update, dash.no_update, dash.no_update,dash.no_update,dash.no_update
     changed_id = [p['prop_id'] for p in callback_context.triggered][0]
-    jason_label = json.dumps([changed_id])
+    jason_label = changed_id
     if 'target' in changed_id:
         return {'font-weight': 'bold'},{'font-weight': 'normal'},"lg","sm",jason_label
     else:
         return {'font-weight': 'normal'},{'font-weight': 'bold'},"sm","lg",jason_label
 
-
-#######reduce image size for better display
-@callback(Output('button-group', 'children'),
-   [Input('json_img_ch', 'data'),
-    Input('json_img_ch2', 'data')])
-def split_images(ch,ch2):
-    ch2_ = np.array(json.loads(ch2))
-    dict_shape = af.img_split_instractions(ch2_)
-    if dict_shape is None:
-        return dash.no_update
-    else:
-        return dbc.Row([
-                html.P('Select image slice'),
-                dcc.Dropdown(options = [{'label':i, 'value':i}  for i in dict_shape],
-                            id='my-input-type',
-                             value=1),
-                            ])
 #
 # # # # loading all the data
 @callback([
-    Output('jason_ch2', 'data'),
-    Output('json_ch2_gs_rgb', 'data'),
-    Output('json_mask_seed','data'),
-    Output('json_mask_target','data'),
-    Output('json_table_prop','data')],
+    ServersideOutput('jason_ch2', 'data'),
+    ServersideOutput('json_ch2_gs_rgb', 'data'),
+    ServersideOutput('json_mask_seed','data'),
+    ServersideOutput('json_mask_target','data'),
+    ServersideOutput('json_table_prop','data')],
    [Input('upload-image', 'filename'),
-    Input('my-input-type','value'),
     State('json_img_ch', 'data'),
     State('json_img_ch2', 'data'),
     State('act_ch', 'value'),
@@ -134,10 +116,8 @@ def split_images(ch,ch2):
     State('global_ther', 'value'),
     State('rmv_object_cyto', 'value'),
     State('rmv_object_cyto_small', 'value'),
-    Input('high_pass', 'value'),
-    Input('low_pass', 'value'),
     State('switch_remove_border','on')])
-def Generate_segmentation_and_table(image,set,ch,ch2,channel,bs,os,osd,ron,bsc,osc,oscd,sms,smsd,gt,roc,rocs,high,low,remove_bord):
+def Generate_segmentation_and_table(image,ch,ch2,channel,bs,os,osd,ron,bsc,osc,oscd,sms,smsd,gt,roc,rocs,remove_bord):
     '''
     Genrate
     3 channel grayscale target PIL RGB
@@ -168,10 +148,7 @@ def Generate_segmentation_and_table(image,set,ch,ch2,channel,bs,os,osd,ron,bsc,o
                                        rmv_object_cyto_small=rocs, remove_border=remove_bord)
     ch_ = np.array(ch)
     ch2_ = np.array(ch2)
-    ch2_ = af.show_image_adjust(ch2_, low_prec=low, up_prec=high)
-    # if set is not None:
-    #     ch_ = af.set_slice(ch_,set)
-    #     ch2_ = af.set_slice(ch2_, set)
+    # ch2_ = af.show_image_adjust(ch2_, low_prec=low, up_prec=high)
     nuc_s = AIPS_object.Nucleus_segmentation(ch_,rescale_image=True,scale_factor=memory_index[sms])
     seg = AIPS_object.Cytosol_segmentation(ch_, ch2_, nuc_s['sort_mask'], nuc_s['sort_mask_bin'],rescale_image=True,scale_factor=memory_index[sms])
     # segmentation traces the nucleus segmented image based on the
@@ -215,11 +192,11 @@ def Generate_segmentation_and_table(image,set,ch,ch2,channel,bs,os,osd,ron,bsc,o
     table_prop = measure.regionprops_table(
         cseg_mask, intensity_image=rgb_input_img, properties=prop_names
     )
-    json_object_ch2 = json.dumps(ch2_.tolist())
-    json_object_ch2_seed_gs_rgb = json.dumps(rgb_input_img.tolist())
-    json_object_mask_seed = json.dumps(seg['sort_mask_sync'].tolist())
-    json_object_mask_target = json.dumps(seg['cseg_mask'].tolist())
-    json_object_table_prop = pd.DataFrame(table_prop).to_json(orient='split')
+    json_object_ch2 = ch2_
+    json_object_ch2_seed_gs_rgb = rgb_input_img
+    json_object_mask_seed = seg['sort_mask_sync']
+    json_object_mask_target = seg['cseg_mask']
+    json_object_table_prop = table_prop
     return json_object_ch2,json_object_ch2_seed_gs_rgb ,json_object_mask_seed,json_object_mask_target,json_object_table_prop
 
 #
@@ -228,9 +205,9 @@ def Generate_segmentation_and_table(image,set,ch,ch2,channel,bs,os,osd,ron,bsc,o
 
 @callback(
     [Output("dump", "children"),
-     Output('json_img','data'),
-     Output('selected_roi_target','data'),
-     Output('selected_roi_ctrl', 'data')
+     ServersideOutput('json_img','data'),
+     ServersideOutput('selected_roi_target','data'),
+     ServersideOutput('selected_roi_ctrl', 'data')
      ],
     [Input("graph","clickData"),
     Input('jason_ch2', 'data'),
@@ -249,15 +226,15 @@ def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_objec
         roi_ctrl = []
         return dash.no_update,dash.no_update,roi_tar,roi_ctrl
     else:
-        label_color_sel = json.loads(label_color)
+        label_color_sel = label_color
         #load 3d np array with seed segmentation
-        ch2_rgb = np.array(json.loads(json_object_ch2_gs_rgb))
+        ch2_rgb = np.array(json_object_ch2_gs_rgb)
         # select seed counter
-        mask_target = np.array(json.loads(json_object_mask_target))
+        mask_target = np.array(json_object_mask_target)
         points = clickData['points']
         value = mask_target[points[0]['y'],points[0]['x']]
         # build a counter map
-        if 'target' in label_color_sel[0]:
+        if 'target' in label_color_sel:
             if on:
                 roi_tar.append(value)
             else:
@@ -269,7 +246,7 @@ def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_objec
                 roi_ctrl.remove(value)
         #update map
         ch2_rgb = countor_map(mask_target, roi_ctrl, roi_tar, ch2_rgb)
-        json_object_fig_updata = json.dumps(ch2_rgb.tolist())
+        json_object_fig_updata = ch2_rgb
         return json.dumps(clickData, indent=2),json_object_fig_updata,roi_tar,roi_ctrl
 
 @callback(
@@ -278,9 +255,9 @@ def display_selected_data(clickData,_ch2_jason,json_object_ch2_gs_rgb,json_objec
              Input('json_ch2_gs_rgb', 'data')])
 def display_image(json_img,json_ch2_gs_rgb):
     try:
-        img_jason = img_as_ubyte(np.array(json.loads(json_img)))
+        img_jason = img_as_ubyte(np.array(json_img))
     except:
-        img = img_as_ubyte(np.array(json.loads(json_ch2_gs_rgb)))
+        img = img_as_ubyte(np.array(json_ch2_gs_rgb))
         img_input_rgb_pil = Image.fromarray(img)
         fig = px.imshow(img_input_rgb_pil, binary_string=True, binary_backend="jpg",width=700,height=700 )
         return dcc.Graph(
@@ -301,7 +278,7 @@ def display_image(json_img,json_ch2_gs_rgb):
 def load_image_and_table(table_prop,roi_ctrl,roi_target,label_color):
     if table_prop is None:
         return dash.no_update
-    table = pd.read_json(table_prop,orient='split')
+    table = pd.DataFrame(table_prop)
     if roi_ctrl is None and roi_target is None:
         roi_ctrl = []
         roi_target = []
@@ -337,23 +314,25 @@ def load_image_and_table(table_prop,roi_ctrl,roi_target,label_color):
                    style={'font-weight': 'bold'}, size='sm'),]
 
 # create a dropdown containing all the names of the files as datatable and add the roi-list
-@callback([Output('storage_list_table', 'data'),
+# first table
+@callback([     Output('storage_list_table', 'data'),
+                Output('list_image_name','data'),
                 Output('drop_down_tables','options'),
-                Output('drop_down_tables','value'),
-               Output('list_image_name','data')],
+                Output('drop_down_tables','value')],
                 [Input('inst', 'n_clicks'),
                 Input('upload-image', 'filename'),
                 Input('json_table_prop', 'data'),
                 Input('selected_roi_ctrl','data'),
                 Input('selected_roi_target','data'),
-                Input('storage_list_table', 'data'),
-                Input('list_image_name','data')])
+                State('storage_list_table', 'data'),
+                State('list_image_name','data')])
 def update_dropdown_table_list(n,image,table_prop,roi_ctrl,roi_target,table_sum_input,list_img_name):
     if n == 0:
         return dash.no_update,dash.no_update,dash.no_update,dash.no_update
     if table_prop is None:
         return dash.no_update,dash.no_update,dash.no_update,dash.no_update
-    table = pd.read_json(table_prop,orient='split')
+    table = pd.DataFrame(table_prop)
+    # adding class column
     table['class'] = [0]*len(table)
     table['file_name'] = image[0]
     if roi_ctrl is None and roi_target is None:
@@ -373,13 +352,19 @@ def update_dropdown_table_list(n,image,table_prop,roi_ctrl,roi_target,table_sum_
         table = table_sum.drop_duplicates(subset =['label','file_name'],keep = 'first', inplace = False)
     if list_img_name is None:
         list_img_name = []
+        list_img_name.append(image[0])
+        list_img_name_option = {'value':list_img_name}
+        list_img_name_value = list_img_name
     else:
         list_img_name.append(image[0])
         list_img_name = np.unique(list_img_name)
+        list_img_name_option = {'value': list_img_name}
+        list_img_name_value = list_img_name
     json_object_table_sum = pd.DataFrame(table).to_json(orient='split')
-    return json_object_table_sum, list_img_name, list_img_name,list_img_name
+    return json_object_table_sum, list_img_name, list_img_name_option,list_img_name_value
 
-@callback([Output("download", "data"),Output("btn", "n_clicks")],
+
+@callback([ServersideOutput("download", "data"),Output("btn", "n_clicks")],
               [Input("btn", "n_clicks"),
                State('my-input-type', 'value'),
                State('upload-image', 'filename'),
@@ -390,7 +375,7 @@ def generate_csv(n,set_slice,image,table_sum,list_img_name):
         return dash.no_update, dash.no_update
     if table_sum is None:
         return dash.no_update, dash.no_update
-    table_input = pd.read_json(table_sum, orient='split')
+    table_input =  pd.read_json(table_sum, orient='split')
     # if len(list_img_name) > 0:
     #     index = table_input.index[table_input['file_name'].isin(list_img_name)].tolist()
     #     table = table_input.drop(index=index)
@@ -401,5 +386,5 @@ def generate_csv(n,set_slice,image,table_sum,list_img_name):
         set_slice = ' '
     table = table_input
     n=0
-    return send_data_frame(table.to_csv, filename=str(set_slice) + image[0].split('.')[0] + "_features.csv"),n
+    return send_data_frame(table.to_csv, filename=image[0].split('.')[0] + "_features.csv"),n
 

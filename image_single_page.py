@@ -24,8 +24,6 @@ from utils import AIPS_module as ai
 
 from dash import html, dcc
 
-
-
 app = dash.Dash(prevent_initial_callbacks=True,
            external_stylesheets=[dbc.themes.JOURNAL, dbc.icons.FONT_AWESOME],)
 
