@@ -1,10 +1,9 @@
 '''
 # update branch
 git add .
-git commit -m "03-05-2022 svm serverside works good - now test multi image display"
+git commit -m "03-07-2022 set buttons for display image slice "
 git branch -m server
 git push origin -u server
-
 '''
 import dash_labs as dl
 import json
@@ -342,4 +341,5 @@ def Updat_offset_cyto(set_n,bar_zoom_cyto,ch2,au,offset_input,bar_ind,image_inpu
 
 if __name__ == "__main__":
     app.run_server()
-    #app.run_server(debug=True)
+
+#app.run_server(debug=True)

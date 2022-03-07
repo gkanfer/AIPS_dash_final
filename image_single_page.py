@@ -3,7 +3,7 @@ import time
 import plotly.express as px
 import json
 import dash
-from dash import ALL
+from dash import ALL,MATCH
 import dash_bootstrap_components as dbc
 import tifffile as tfi
 import os
@@ -17,10 +17,11 @@ import base64
 import pandas as pd
 import io
 from io import BytesIO
-from utils.controls import controls, controls_nuc, controls_cyto, upload_parm
+from utils.controls import controls, controls_nuc, controls_cyto, upload_parm, svm_slice_slider
 from utils.Dash_functions import parse_contents
 from utils import AIPS_functions as af
 from utils import AIPS_module as ai
+
 
 from dash import html, dcc
 
@@ -70,8 +71,10 @@ app.layout = dbc.Container(
                     dcc.Loading(html.Div(id='img-output'), type="circle", style={'height': '100%', 'width': '100%'}),
                 ]),
                 html.Div(id='run_content'),
+                #svm_slice_slider,
                 html.Div(id='image_data_holder', children=[]),
                 html.Div(id='image_display_holder'),
+                html.Div(id='tab_display'),
                 dcc.Store(id='json_img_ch',data=None),
                 dcc.Store(id='json_img_ch2',data=None),
                 dcc.Store(id='json_react', data=None), # rectangle for memory reduction
@@ -140,12 +143,28 @@ def image_chanked(ch,ch2,children):
         children.append(new_store)
     return children
 
+@app.callback(
+    Output('tab_display', 'children'),
+    Input({'type': 'store_obj', 'index': ALL}, 'data')
+)
+def display_tab(data):
+    count = np.linspace(1,len(data),len(data))
+    return [html.Div(children=[
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Button("Slice number: {}".format(int(c)),
+                                   id ={'type':'Image_number_slice',
+                                        'index':int(c)}) for c in count])
+                             ])
+                        ])
+                ]
 
 @app.callback(
     Output('img-output', 'children'),
-    Input({'type': 'store_obj', 'index': ALL}, 'data')
+    Input({'type': 'store_obj', 'index': ALL}, 'data'),
+    Input({'type': 'Image_number_slice', 'index': ALL}, 'title')
 )
-def display_output(data):
+def display_output(data,title):
     ll = []
     count = 0
     for slice in data:
@@ -170,6 +189,33 @@ def display_output(data):
 
 
 
+
+
+
+
+# @app.callback(
+#     Output('img-output', 'children'),
+#     Input({'type': 'store_obj', 'index': ALL}, 'data')
+# )
+# def display_output(data):
+#     ll = []
+#     count = 0
+#     for slice in data:
+#         count += 1
+#         temp_arr = np.array(slice)
+#         pix_2 = temp_arr * 65535.000
+#         im_pil = Image.fromarray(np.uint16(pix_2))
+#         fig_ch2 = px.imshow(im_pil, binary_string=True, binary_backend="jpg", width=250, height=250, title=str(count),
+#                             binary_compression_level=9).update_xaxes(showticklabels=False).update_yaxes(
+#                             showticklabels=False)
+#         ll.append(fig_ch2)
+#     return [html.Div(children=[
+#                 dbc.Row([
+#                     dbc.Col(
+#                     dcc.Graph(id='slice_disp'+str(fig['layout']['title']['text']),figure=fig))
+#                     for fig in ll ])
+#                         ],
+#                     ) ]
 
 
 #

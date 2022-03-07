@@ -329,6 +329,20 @@ upload_parm = dbc.Row([
                     html.Button('Upload parameters', id='submit-parameters', n_clicks=0)])
                     ])
 
+svm_slice_slider =  html.Div(
+                    [
+                    dbc.Label("Remove large objects:"),
+                    dcc.Slider(
+                        id='slice_slider',
+                        min=1,
+                        max=16,
+                        step=4,
+                        marks={i: i for i in [1,4,8,16]},
+                        value=1
+                    ),
+                    ]
+                    )
+
 def generate_team_button(Name):
     return dbc.Button(children=str(Name),
                       color="primary",
