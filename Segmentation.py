@@ -50,9 +50,12 @@ from utils import AIPS_functions as af
 from utils import AIPS_module as ai
 from utils import display_and_xml as dx
 from utils.Display_composit import image_with_contour, countor_map
-count = np.linspace(1,4,4)
-for c in count:
-    print(int(c)-1)
+import re
+set = '{"index":1,"type":"Image_number_slice"}.n_clicks'
+text = re.search('"index":.',set)
+x = re.sub(',.*','', set).split(':')[1]
+x.split(':')[1]
+
 
 path = '/Users/kanferg/Desktop/NIH_Youle/Colobration/Elliot/drive-download-20220216T203417Z-001/'
 #tifWT_37C_DMSO.tif

@@ -19,6 +19,7 @@ import pandas as pd
 from scipy.ndimage.morphology import binary_fill_holes
 import base64
 from datetime import datetime
+import re
 from utils.display_and_xml import unique_rand
 from utils import display_and_xml as dx
 
@@ -375,3 +376,7 @@ def set_slice(img,num):
         3: [w / 2, (w * 3) / 2, h / 2, (h * 3) / 2],
         4: [(w * 3) / 2, w, (h * 3) / 2, h],}
     return  img[int(dict[num][0]) : int(dict[num][1]), int(dict[num][2]) : int(dict[num][3])]
+
+def grep(pattern,word_list):
+    expr = re.compile(pattern)
+    return [elem for elem in word_list if expr.match(elem)]

@@ -3,7 +3,7 @@ import time
 import plotly.express as px
 import json
 import dash
-from dash import ALL,MATCH
+from dash import ALL,MATCH,callback_context
 import dash_bootstrap_components as dbc
 import tifffile as tfi
 import os
@@ -17,6 +17,7 @@ import base64
 import pandas as pd
 import io
 from io import BytesIO
+import re
 from utils.controls import controls, controls_nuc, controls_cyto, upload_parm, svm_slice_slider
 from utils.Dash_functions import parse_contents
 from utils import AIPS_functions as af
@@ -162,25 +163,22 @@ def display_tab(data):
 @app.callback(
     Output('img-output', 'children'),
     Input({'type': 'store_obj', 'index': ALL}, 'data'),
-    Input({'type': 'Image_number_slice', 'index': ALL}, 'title')
+    Input({'type':'Image_number_slice','index':ALL}, 'n_clicks')
 )
 def display_output(data,title):
     ll = []
-    count = 0
-    for slice in data:
-        count += 1
-        temp_arr = np.array(slice)
-        pix_2 = temp_arr * 65535.000
-        im_pil = Image.fromarray(np.uint16(pix_2))
-        fig_ch2 = px.imshow(im_pil, binary_string=True, binary_backend="jpg", width=250, height=250, title=str(count),
-                            binary_compression_level=9).update_xaxes(showticklabels=False).update_yaxes(
-                            showticklabels=False)
-        ll.append(fig_ch2)
+    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
+    active_index = re.sub(',.*','', changed_id).split(':')[1]
+    temp_arr = np.array(data[int(active_index)-1])
+    pix_2 = temp_arr * 65535.000
+    im_pil = Image.fromarray(np.uint16(pix_2))
+    fig_ch2 = px.imshow(im_pil, binary_string=True, binary_backend="jpg", width=700, height=700, title=active_index,
+                        binary_compression_level=9).update_xaxes(showticklabels=False).update_yaxes(
+        showticklabels=False)
     return [html.Div(children=[
                 dbc.Row([
                     dbc.Col(
-                    dcc.Graph(id='slice_disp'+str(fig['layout']['title']['text']),figure=fig))
-                    for fig in ll ])
+                    dcc.Graph(id='slice_disp'+str(fig_ch2['layout']['title']['text']),figure=fig_ch2)) ])
                         ],
                     ) ]
 
