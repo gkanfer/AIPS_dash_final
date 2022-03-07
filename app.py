@@ -1,7 +1,7 @@
 '''
 # update branch
 git add .
-git commit -m "03-07-2022 set buttons for display image slice works for the image_single_dispaly "
+git commit -m "03-07-2022 SVM use slicing not very good for reducing memory "
 git branch -m server
 git push origin -u server
 '''

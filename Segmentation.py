@@ -75,8 +75,17 @@ ch2 = img['0']
 nuc_s = AIPS_object.Nucleus_segmentation(img['1'], inv=False, for_dash=False,rescale_image=False,scale_factor=memory_index[1])
 seg = AIPS_object.Cytosol_segmentation(ch, ch2, nuc_s['sort_mask'], nuc_s['sort_mask_bin'], rescale_image=False,scale_factor=memory_index[1])
 
+H = np.shape(ch2)[0] // 2
+W = np.shape(ch2)[1] // 2
+tiles_ch2 = [ch2[x:x + H, y:y + W] for x in range(0, ch2.shape[0], H) for y in range(0, ch2.shape[1], W)]
+tiles_ch = [ch[x:x + H, y:y + W] for x in range(0, ch.shape[0], H) for y in range(0, ch.shape[1], W)]
+for t_ch,t_ch2 in zip(tiles_ch,tiles_ch2):
+    print(np.shape(t_ch2))
 
-
+    # count += 1
+    # new_store = dcc.Store(id={'type': 'store_obj',
+    #                           'index': count},
+    #                       data=tile)
 
 
 nmask2 = nuc_s['nmask2']
