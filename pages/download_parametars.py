@@ -32,12 +32,11 @@ layout = html.Div([
     State('global_ther', 'value'),
     State('rmv_object_cyto', 'value'),
     State('rmv_object_cyto_small', 'value'),
-    State('graduated-bar-slider-memory-scale','value'),
     ])
-def Save_parameters_csv(nnn,image,channel,bs,os,ron,bsc,osc,gt,roc,rocs,memory_reduction):
+def Save_parameters_csv(nnn,image,channel,bs,os,ron,bsc,osc,gt,roc,rocs):
     dict = {'act_ch':[channel],'block_size':[bs],'offset':[os],'rmv_object_nuc':[ron],'block_size_cyto':[bsc],
             'offset_cyto':[osc], 'global_ther':[gt],
-            'rmv_object_cyto':[roc],'rmv_object_cyto_small':[rocs],'memory_reduction':memory_reduction}
+            'rmv_object_cyto':[roc],'rmv_object_cyto_small':[rocs],'memory_reduction':1}
     df = pd.DataFrame(dict)
     df.to_csv(image[0].split('.')[0] + '_parameters.csv', encoding='utf-8', index=False)
     return [html.P("done")]

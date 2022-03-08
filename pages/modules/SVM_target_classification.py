@@ -21,7 +21,6 @@ from dash_extensions.snippets import send_data_frame
 import numpy as np
 from PIL import Image
 import plotly.express as px
-import re
 from utils.controls import generate_team_button
 from utils.Display_composit import countor_map,row_highlight
 from utils import AIPS_module as ai
@@ -44,8 +43,7 @@ layout = html.Div(
                             dcc.Tab(label="Model generation", id = "Model-generation-id", value="Model-generation-val",style={'color': 'black'},selected_style={'color': 'red'},disabled=True),
                             dcc.Tab(label="Model test", id = "Model-test-id", value="Model-test-val",style={'color': 'black'},selected_style={'color': 'red'},disabled=True),
                     ]),
-            html.Div(id='ch_holder', children=[]),
-            html.Div(id='ch2_holder',children=[]),
+            html.Div(id='button-group',children=[]),
             dbc.Button('Target', id='target', color="success", className="me-1", n_clicks=0, active=True,
                        style={'font-weight': 'normal'}, size='lg'),
             dbc.Button('Control', id='control', color="danger", className="me-1", n_clicks=0, active=True,
@@ -53,7 +51,6 @@ layout = html.Div(
             html.Div(id='json_label_state'),
             dbc.Row([
                     dbc.Col([
-                    html.Div(id='Tab_slice'),
                     html.Div(id='Tab_image_display'),
                     daq.BooleanSwitch(id='switch_pick_cell',on=True,label="Select cells",labelPosition="top"),
                     daq.BooleanSwitch(id='switch_remove_border',on=False,label="remove cells touching borders",labelPosition="top"),
@@ -65,8 +62,6 @@ layout = html.Div(
                     ],md=2),
                 ]),
             html.Div(id='dump',hidden=True),
-            dcc.Store(id='ch_svm',storage_type='session'),
-            dcc.Store(id='ch2_svm',storage_type='session'),
             dcc.Store(id='jason_ch2'),
             dcc.Store(id='json_ch2_gs_rgb'), #3ch
             dcc.Store(id='json_mask_seed'),
@@ -97,58 +92,7 @@ def displayClick(targt_btn, ctrl_btn):
     else:
         return {'font-weight': 'normal'},{'font-weight': 'bold'},"sm","lg",jason_label
 
-#Test if need to slice image for better memory handling, according to image size
-@callback([
-    Output('ch_holder', 'children'),
-    Output('ch2_holder','children')],
-   [Input('json_img_ch', 'data'),
-    Input('json_img_ch2', 'data'),
-    State('ch_holder', 'children'),
-    State('ch2_holder', 'children'),
-   ])
-def store_slice(ch,ch2,ch_child,ch2_child):
-    ch = np.array(ch)
-    ch2 = np.array(ch2)
-    if np.shape(ch2)[0] < 500:
-        return html.P('Image smile to small'),dash.no_update
-    else:
-        H = np.shape(ch2)[0] // 2
-        W = np.shape(ch2)[1] // 2
-        tiles_ch = [ch[x:x + H, y:y + W] for x in range(0, ch.shape[0], H) for y in range(0, ch.shape[1], W)]
-        tiles_ch2 = [ch2[x:x + H, y:y + W] for x in range(0, ch2.shape[0], H) for y in range(0, ch2.shape[1], W)]
-        count = 0
-        for t_ch,t_ch2 in zip(tiles_ch,tiles_ch2):
-            count += 1
-            new_store_ch = dcc.Store(id={'type': 'store_obj_ch',
-                                      'index': count},
-                                  data=tiles_ch)
-            new_store_ch2 = dcc.Store(id={'type': 'store_obj_ch2',
-                                      'index': count},
-                                  data=tiles_ch2)
-            ch_child.append(new_store_ch)
-            ch2_child.append(new_store_ch2)
-        return ch_child,ch2_child
-
-# display the tabs for slice selection
-@callback(
-    Output('Tab_slice', 'children'),
-    Input({'type': 'store_obj_ch', 'index': ALL}, 'data'),
-)
-def display_tab(data):
-    count = np.linspace(1,len(data),len(data))
-    return [html.Div(children=[
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Button("Slice number: {}".format(int(c)),
-                                   id ={'type':'Image_number_slice',
-                                        'index':int(c)}) for c in count])
-                             ])
-                        ])
-                ]
-
-
-
-
+#
 # # # # loading all the data
 @callback([
     ServersideOutput('jason_ch2', 'data'),
@@ -157,11 +101,8 @@ def display_tab(data):
     ServersideOutput('json_mask_target','data'),
     ServersideOutput('json_table_prop','data')],
    [Input('upload-image', 'filename'),
-    Input({'type': 'store_obj_ch', 'index': ALL}, 'data'),
-    Input({'type': 'store_obj_ch2', 'index': ALL}, 'data'),
-    Input({'type':'Image_number_slice','index':ALL}, 'n_clicks'),
-    State('json_img_ch', 'data'),
-    State('json_img_ch2', 'data'),
+    Input('json_img_ch', 'data'),
+    Input('json_img_ch2', 'data'),
     State('act_ch', 'value'),
     State('block_size','value'),
     State('offset','value'),
@@ -170,13 +111,11 @@ def display_tab(data):
     State('block_size_cyto', 'value'),
     State('offset_cyto','value'),
     State('offset_cyto_store', 'data'),
-    State('graduated-bar-slider-memory-scale', 'value'),
-    State('slider-memory-scale','data'),
     State('global_ther', 'value'),
     State('rmv_object_cyto', 'value'),
     State('rmv_object_cyto_small', 'value'),
     State('switch_remove_border','on')])
-def Generate_segmentation_and_table(image,ch_slice,ch2_slice,slice_click,ch,ch2,channel,bs,os,osd,ron,bsc,osc,oscd,sms,smsd,gt,roc,rocs,remove_bord):
+def Generate_segmentation_and_table(image,ch,ch2,channel,bs,os,osd,ron,bsc,osc,oscd,gt,roc,rocs,remove_bord):
     '''
     Genrate
     3 channel grayscale target PIL RGB
@@ -195,76 +134,64 @@ def Generate_segmentation_and_table(image,ch_slice,ch2_slice,slice_click,ch,ch2,
         osc=osc
     else:
         osc=oscd
-    if smsd is None:
-        sms=sms
-    else:
-        sms=smsd
     memory_index = {1: [0.25, 4], 2: [0.125, 8], 3: [0.062516, 16], 4: [0.031258, 32]}
     AIPS_object = ai.Segment_over_seed(Image_name=str(image[0]), path=UPLOAD_DIRECTORY, rmv_object_nuc=ron,
                                        block_size=bs,
                                        offset=os,
                                        block_size_cyto=bsc, offset_cyto=osc, global_ther=gt, rmv_object_cyto=roc,
                                        rmv_object_cyto_small=rocs, remove_border=remove_bord)
-    # load slice according to tab clicked
-    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
-    active_index = re.sub(',.*', '', changed_id).split(':')[1]
-    ch_ = np.array(ch_slice[int(active_index)-1])[0,:,:]
-    ch2_ = np.array(ch2_slice[int(active_index)-1])[0,:,:]
+    ch_ = np.array(ch)
+    ch2_ = np.array(ch2)
     # ch2_ = af.show_image_adjust(ch2_, low_prec=low, up_prec=high)
-    nuc_s = AIPS_object.Nucleus_segmentation(ch_,rescale_image=True,scale_factor=memory_index[sms])
-    seg = AIPS_object.Cytosol_segmentation(ch_, ch2_, nuc_s['sort_mask'], nuc_s['sort_mask_bin'],rescale_image=True,scale_factor=memory_index[sms])
+    nuc_s = AIPS_object.Nucleus_segmentation(ch_,rescale_image=True,scale_factor=memory_index[1])
+    seg = AIPS_object.Cytosol_segmentation(ch_, ch2_, nuc_s['sort_mask'], nuc_s['sort_mask_bin'],rescale_image=True,scale_factor=memory_index[1])
     # segmentation traces the nucleus segmented image based on the
     ch2_255 = (ch2_ / ch2_.max()) * 255
     ch2_u8 = np.uint8(ch2_255)
     # ROI to 32bit
     sort_mask_sync = seg['sort_mask_sync']
     cseg_mask = seg['cseg_mask']
-    # do not update if there are no segment detacted
-    if len(np.unique(cseg_mask)) < 1:
-        return html.P("No segmenation were detacted in image slice number {}".format(active_index)),\
-               dash.no_update,dash.no_update,dash.no_update,dash.no_update
-    else:
-        sort_mask_sync = af.remove_gradiant_label_border(sort_mask_sync)
-        cseg_mask = af.remove_gradiant_label_border(cseg_mask)
-        # draw outline only
-        bf_mask = dx.binary_frame_mask(ch2_u8, sort_mask_sync)
-        bf_mask = np.where(bf_mask == 1, True, False)
-        c_mask = dx.binary_frame_mask(ch2_u8, cseg_mask)
-        c_mask = np.where(c_mask == 1, True, False)
-        rgb_input_img = np.zeros((np.shape(ch2_u8)[0], np.shape(ch2_u8)[1], 3), dtype=np.uint8)
-        rgb_input_img[:, :, 0] = ch2_u8
-        rgb_input_img[:, :, 1] = ch2_u8
-        rgb_input_img[:, :, 2] = ch2_u8
-        rgb_input_img[bf_mask > 0, 2] = 255 # 3d grayscale array where green channel is for seed segmentation
-        #label_array = nuc_s['sort_mask']
-        prop_names = [
-            "label",
-            "area",
-            "eccentricity",
-            "euler_number",
-            "extent",
-            "feret_diameter_max",
-            "inertia_tensor",
-            "inertia_tensor_eigvals",
-            "moments",
-            "moments_central",
-            "moments_hu",
-            "moments_normalized",
-            "orientation",
-            "perimeter",
-            "perimeter_crofton",
-            # "slice",
-            "solidity"
-        ]
-        table_prop = measure.regionprops_table(
-            cseg_mask, intensity_image=rgb_input_img, properties=prop_names
-        )
-        json_object_ch2 = ch2_
-        json_object_ch2_seed_gs_rgb = rgb_input_img
-        json_object_mask_seed = seg['sort_mask_sync']
-        json_object_mask_target = seg['cseg_mask']
-        json_object_table_prop = table_prop
-        return json_object_ch2,json_object_ch2_seed_gs_rgb ,json_object_mask_seed,json_object_mask_target,json_object_table_prop
+    sort_mask_sync = af.remove_gradiant_label_border(sort_mask_sync)
+    cseg_mask = af.remove_gradiant_label_border(cseg_mask)
+    # draw outline only
+    bf_mask = dx.binary_frame_mask(ch2_u8, sort_mask_sync)
+    bf_mask = np.where(bf_mask == 1, True, False)
+    c_mask = dx.binary_frame_mask(ch2_u8, cseg_mask)
+    c_mask = np.where(c_mask == 1, True, False)
+    rgb_input_img = np.zeros((np.shape(ch2_u8)[0], np.shape(ch2_u8)[1], 3), dtype=np.uint8)
+    rgb_input_img[:, :, 0] = ch2_u8
+    rgb_input_img[:, :, 1] = ch2_u8
+    rgb_input_img[:, :, 2] = ch2_u8
+    rgb_input_img[bf_mask > 0, 2] = 255 # 3d grayscale array where green channel is for seed segmentation
+    #label_array = nuc_s['sort_mask']
+    prop_names = [
+        "label",
+        "area",
+        "eccentricity",
+        "euler_number",
+        "extent",
+        "feret_diameter_max",
+        "inertia_tensor",
+        "inertia_tensor_eigvals",
+        "moments",
+        "moments_central",
+        "moments_hu",
+        "moments_normalized",
+        "orientation",
+        "perimeter",
+        "perimeter_crofton",
+        # "slice",
+        "solidity"
+    ]
+    table_prop = measure.regionprops_table(
+        cseg_mask, intensity_image=rgb_input_img, properties=prop_names
+    )
+    json_object_ch2 = ch2_
+    json_object_ch2_seed_gs_rgb = rgb_input_img
+    json_object_mask_seed = seg['sort_mask_sync']
+    json_object_mask_target = seg['cseg_mask']
+    json_object_table_prop = table_prop
+    return json_object_ch2,json_object_ch2_seed_gs_rgb ,json_object_mask_seed,json_object_mask_target,json_object_table_prop
 
 #
 # ### load image and table side by side
@@ -391,17 +318,22 @@ def load_image_and_table(table_prop,roi_ctrl,roi_target,label_color):
                 Input('json_table_prop', 'data'),
                 Input('selected_roi_ctrl','data'),
                 Input('selected_roi_target','data'),
+                Input('slice_selc','data'), # from slice in app page
                 State('storage_list_table', 'data'),
                 State('list_image_name','data')])
-def update_dropdown_table_list(n,image,table_prop,roi_ctrl,roi_target,table_sum_input,list_img_name):
+def update_dropdown_table_list(n,image,table_prop,roi_ctrl,roi_target,active_index,table_sum_input,list_img_name):
     if n == 0:
         return dash.no_update,dash.no_update,dash.no_update,dash.no_update
     if table_prop is None:
         return dash.no_update,dash.no_update,dash.no_update,dash.no_update
     table = pd.DataFrame(table_prop)
     # adding class column
+    if active_index is None:
+        image_name = image[0]
+    else:
+        image_name = active_index + '_'  + image[0]
     table['class'] = [0]*len(table)
-    table['file_name'] = image[0]
+    table['file_name'] = image_name
     if roi_ctrl is None and roi_target is None:
         roi_ctrl = []
         roi_target = []
@@ -419,11 +351,11 @@ def update_dropdown_table_list(n,image,table_prop,roi_ctrl,roi_target,table_sum_
         table = table_sum.drop_duplicates(subset =['label','file_name'],keep = 'first', inplace = False)
     if list_img_name is None:
         list_img_name = []
-        list_img_name.append(image[0])
+        list_img_name.append(image_name)
         list_img_name_option = {'value':list_img_name}
         list_img_name_value = list_img_name
     else:
-        list_img_name.append(image[0])
+        list_img_name.append(image_name)
         list_img_name = np.unique(list_img_name)
         list_img_name_option = {'value': list_img_name}
         list_img_name_value = list_img_name
@@ -433,25 +365,25 @@ def update_dropdown_table_list(n,image,table_prop,roi_ctrl,roi_target,table_sum_
 
 @callback([ServersideOutput("download", "data"),Output("btn", "n_clicks")],
               [Input("btn", "n_clicks"),
-               State('my-input-type', 'value'),
-               State('upload-image', 'filename'),
-               State('storage_list_table', 'data'),
-               State('drop_down_tables','value')])
-def generate_csv(n,set_slice,image,table_sum,list_img_name):
+                State('active_index','data'), # from slice in app page
+                State('my-input-type', 'value'),
+                State('upload-image', 'filename'),
+                State('storage_list_table', 'data'),
+                State('drop_down_tables','value'),
+               ])
+def generate_csv(n,active_index,set_slice,image,table_sum,list_img_name):
     if n==0:
         return dash.no_update, dash.no_update
     if table_sum is None:
         return dash.no_update, dash.no_update
+    if active_index is None:
+        image_name = image[0]
+    else:
+        image_name = active_index + '_' + image[0]
     table_input =  pd.read_json(table_sum, orient='split')
-    # if len(list_img_name) > 0:
-    #     index = table_input.index[table_input['file_name'].isin(list_img_name)].tolist()
-    #     table = table_input.drop(index=index)
-    # else:
-    #     table=table_input
     ########## need to test multiple image inspection
     if set_slice is None:
         set_slice = ' '
     table = table_input
     n=0
-    return send_data_frame(table.to_csv, filename=image[0].split('.')[0] + "_features.csv"),n
-
+    return send_data_frame(table.to_csv, filename=image_name.split('.')[0] + "_features.csv"),n

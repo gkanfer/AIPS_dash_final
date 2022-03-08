@@ -64,19 +64,18 @@ controls = dbc.Card(
             html.Br(),
             # redusing memory
             dbc.Col([
-                daq.GraduatedBar(
-                    id='graduated-bar-memory-scale',
-                    label="Memory reduce",
-                    value=1,
-                    min=1,
-                    max=4
+                daq.BooleanSwitch(
+                    label='slice image',
+                    id='slice_image_on',
+                    disabled=False,
+                    on=False,
                 ),
                 dcc.Slider(
-                    id='graduated-bar-slider-memory-scale',
-                    min=1,
-                    max=4,
-                    step=1,
-                    value=1
+                    id='graduated-bar-slice_image',
+                    min=2,
+                    max=8,
+                    step=2,
+                    value=2
                 ),
             ]),
             dbc.Col(

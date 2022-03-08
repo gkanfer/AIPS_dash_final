@@ -40,9 +40,8 @@ layout = html.Div(
     State('global_ther', 'value'),
     State('rmv_object_cyto', 'value'),
     State('rmv_object_cyto_small', 'value'),
-    State('graduated-bar-slider-memory-scale', 'value'),
      ])
-def update_nuc(image,ch,ch2,channel,high,low,bs,os,ron,bsc,osc,gt,roc,rocs,sms):
+def update_nuc(image,ch,ch2,channel,high,low,bs,os,ron,bsc,osc,gt,roc,rocs):
     memory_index = {1: [0.25, 4], 2: [0.125, 8], 3: [0.062516, 16], 4: [0.031258, 32]}
     AIPS_object = ai.Segment_over_seed(Image_name=image[0], path=UPLOAD_DIRECTORY, rmv_object_nuc=ron,
                                        block_size=bs,
@@ -52,7 +51,7 @@ def update_nuc(image,ch,ch2,channel,high,low,bs,os,ron,bsc,osc,gt,roc,rocs,sms):
     ch_ = np.array(json.loads(ch))
     ch2_ = np.array(json.loads(ch2))
     ch_3c = af.gray_scale_3ch(ch_)
-    nuc_s = AIPS_object.Nucleus_segmentation(ch_, rescale_image=True,scale_factor=memory_index[sms])
+    nuc_s = AIPS_object.Nucleus_segmentation(ch_, rescale_image=True,scale_factor=memory_index[1])
     sort_mask = nuc_s['sort_mask']
     # segmentation traces the nucleus segmented image based on the
     fig_im_pil_sort_mask = af.plot_composite_image(ch_3c, sort_mask, fig_title='RGB map - seed', alpha=0.2)
