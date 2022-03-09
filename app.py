@@ -1,7 +1,7 @@
 '''
 # update branch
 git add .
-git commit -m "03-08-2022 down-sample image still very slow "
+git commit -m "03-09-2022 change marks value"
 git branch -m server
 git push origin -u server
 '''
@@ -31,7 +31,15 @@ from utils.Dash_functions import parse_contents
 from utils import AIPS_functions as af
 from utils import AIPS_module as ai
 import pathlib
-
+import dash_canvas
+from dash_canvas.components import image_upload_zone
+from dash_canvas.utils import (
+    image_string_to_PILImage,
+    array_to_data_url,
+    parse_jsonstring_line,
+    brightness_adjust,
+    contrast_adjust,
+)
 UPLOAD_DIRECTORY = "/app_uploaded_files"
 
 # style_nav = {'background-color':'#01183A',
@@ -42,7 +50,8 @@ app = dash.Dash(
     __name__,
     plugins=[dl.plugins.pages],
     external_stylesheets=[dbc.themes.JOURNAL, dbc.icons.FONT_AWESOME],
-    prevent_initial_callbacks=True
+    prevent_initial_callbacks=True,
+    suppress_callback_exceptions=True
 )
 
 nav_bar = dbc.Nav(
@@ -111,7 +120,6 @@ app.layout = dbc.Container(
                 nav_bar,
                 html.Div(id='Tab_slice'),
                 dl.plugins.page_container,
-                html.Div(id='run_content'),
                 html.Div(id='ch_holder', children=[]),
                 html.Div(id='ch2_holder',children=[]),
                 dcc.Store(id='slice_selc',data=None),
@@ -167,7 +175,7 @@ def Load_image(n,pram,cont):
 
 
 @app.callback(
-    [Output('run_content', 'children'),
+    [
     ServersideOutput('json_img_ch', 'data'),
     ServersideOutput('json_img_ch2', 'data')],
     [Input('submit-val', 'n_clicks'),
@@ -184,7 +192,7 @@ def Load_image(n,image,cont,channel_sel,react,ch_slice,ch2_slice,slice):
     react: reactangle from draw compnante of user
     '''
     if n == 0:
-        return dash.no_update,dash.no_update,dash.no_update
+        return dash.no_update,dash.no_update
     if slice is True and ch_slice is not None:
         ch_ = ch_slice
         ch2_ = ch2_slice
@@ -206,7 +214,7 @@ def Load_image(n,image,cont,channel_sel,react,ch_slice,ch2_slice,slice):
             ch2_ = ch2_[y0:y1, x0:x1]
     json_object_img_ch = ch_
     json_object_img_ch2 = ch2_
-    return [html.Button('Run', id='run-val', n_clicks=0)],json_object_img_ch,json_object_img_ch2
+    return json_object_img_ch,json_object_img_ch2
 ################################################
 #     Slice image if it is too large
 ################################################

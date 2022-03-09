@@ -19,6 +19,10 @@ import re
 from random import randint
 from io import BytesIO
 
+# decimal 1 to 99 global variable
+integer_1_99 = list(np.around(np.arange(1, 99, 10),1)-1)
+integer_1_99[0] = 1
+integer_1_99.append(99)
 
 controls = dbc.Card(
         [html.Div(
@@ -43,7 +47,7 @@ controls = dbc.Card(
                         min=1,
                         max=99,
                         step=1,
-                        marks={i: i for i in [20, 30, 40, 50 ,60 ,70 ,80]},
+                        marks={i: integer_1_99[i] for i in range(len(integer_1_99))},
                         value=99
                         ),
                 ]
@@ -56,7 +60,7 @@ controls = dbc.Card(
                         min=1,
                         max=99,
                         step=1,
-                        marks={i: i for i in [20, 30, 40, 50 ,60 ,70 ,80]},
+                        marks={i: integer_1_99[i] for i in range(len(integer_1_99))},
                         value=1,
                         ),
             ]),
@@ -146,7 +150,7 @@ controls_nuc = dbc.Card(
                         min=0.000001,
                         max=0.9,
                         step=0.001,
-                        marks={i: i for i in [0.01,0.8]},
+                        marks={i: i for i in [0.000001,0.9]},
                         value=0.001
                     ),
                 ]
@@ -159,9 +163,9 @@ controls_nuc = dbc.Card(
                     dcc.Slider(
                         id='block_size',
                         min=1,
-                        max=101,
+                        max=99,
                         step=2,
-                        marks={i: i for i in [20, 30, 40, 50 ,60 ,70 ,80]},
+                        marks={i: integer_1_99[i] for i in range(len(integer_1_99))},
                         value=59,
                         #tooltip = { 'always_visible': True }
                         ),
@@ -241,7 +245,7 @@ controls_cyto = dbc.Card(
                         min=0.000001,
                         max=0.9,
                         step=0.001,
-                        marks={i: i for i in [0.001,0.9]},
+                        marks={i: i for i in [0.000001,0.9]},
                         value=0.001,
                         #tooltip = { 'always_visible': True }
                     ),
@@ -255,7 +259,7 @@ controls_cyto = dbc.Card(
                         min=1,
                         max=51,
                         step=2,
-                        marks={i: i for i in [20, 30, 40, 50, 60, 70, 80]},
+                        marks={i: integer_1_99[i] for i in range(len(integer_1_99))},
                         value=13,
                         #tooltip = { 'always_visible': True }
                         ),

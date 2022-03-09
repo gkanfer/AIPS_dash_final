@@ -21,8 +21,7 @@ layout = html.Div([
     [Output('img-nuc-output', 'children'),
     Output('tar', 'active'),
     Output('tar', 'disabled')],
-    [Input('run-val', 'n_clicks'),
-    Input('json_img_ch', 'data'),
+    [Input('json_img_ch', 'data'),
     Input('json_img_ch2', 'data'),
     State('upload-image', 'filename'),
     State('upload-image', 'contents'),
@@ -40,7 +39,7 @@ layout = html.Div([
     Input('rmv_object_cyto', 'value'),
     Input('rmv_object_cyto_small', 'value'),
     Input('save_temp','on')])
-def Parameters_initiation(nn,ch,ch2, image,cont,channel,int_on_nuc,high,low,bs,os,ron,bsc,int_on_cyto,osc,gt,roc,rocs,save_temp):
+def Parameters_initiation(ch,ch2, image,cont,channel,int_on_nuc,high,low,bs,os,ron,bsc,int_on_cyto,osc,gt,roc,rocs,save_temp):
     memory_index =  {1:[0.25,4],2:[0.125,8],3:[0.062516,16],4:[0.031258,32]}
     AIPS_object = ai.Segment_over_seed(Image_name=image[0], path=UPLOAD_DIRECTORY,rmv_object_nuc=ron,
                                        block_size=bs,

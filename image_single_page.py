@@ -18,6 +18,15 @@ import pandas as pd
 import io
 from io import BytesIO
 import re
+import dash_canvas
+from dash_canvas.components import image_upload_zone
+from dash_canvas.utils import (
+    image_string_to_PILImage,
+    array_to_data_url,
+    parse_jsonstring_line,
+    brightness_adjust,
+    contrast_adjust,
+)
 from utils.controls import controls, controls_nuc, controls_cyto, upload_parm, svm_slice_slider
 from utils.Dash_functions import parse_contents
 from utils import AIPS_functions as af
@@ -25,6 +34,11 @@ from utils import AIPS_module as ai
 
 
 from dash import html, dcc
+
+integer_1_99 = list(np.around(np.arange(1, 99, 10),1)-1)
+integer_1_99[0] = 1
+integer_1_99.append(99)
+marks = {integer_1_99[i]: '{}'.format(integer_1_99[i]) for i in range(len(integer_1_99))}
 
 app = dash.Dash(prevent_initial_callbacks=True,
            external_stylesheets=[dbc.themes.JOURNAL, dbc.icons.FONT_AWESOME],)
@@ -43,26 +57,26 @@ app.layout = dbc.Container(
                         ]),className='file_uploader',multiple=True
                     ),
                 html.Button('Submit', id='submit-val', n_clicks=0),
-                dbc.Accordion(
-                            [
-                                dbc.AccordionItem(children=
-                                [
-                        controls,
-                                ],title='Image configuration'),
-                                dbc.AccordionItem(children=
-                                [
-                        controls_nuc,
-                                ],title='Seed segmentation config'),
-                                dbc.AccordionItem(children=
-                                [
-                        controls_cyto,
-                                ], title='Target segmentation config'),
-                                dbc.AccordionItem(children=
-                                [
-                        upload_parm,
-
-                                ], title='Update parameters'),
-                            ], start_collapsed=True),
+                # dbc.Accordion(
+                #             [
+                #                 dbc.AccordionItem(children=
+                #                 [
+                #         controls,
+                #                 ],title='Image configuration'),
+                #                 dbc.AccordionItem(children=
+                #                 [
+                #         controls_nuc,
+                #                 ],title='Seed segmentation config'),
+                #                 dbc.AccordionItem(children=
+                #                 [
+                #         controls_cyto,
+                #                 ], title='Target segmentation config'),
+                #                 dbc.AccordionItem(children=
+                #                 [
+                #         upload_parm,
+                #
+                #                 ], title='Update parameters'),
+                #             ], start_collapsed=True),
                 html.Br(),
                 html.Div(id='Tab_table_display'),
             ], width={"size": 4}),
@@ -71,11 +85,27 @@ app.layout = dbc.Container(
                     dbc.Alert(id='alert_display', is_open=False),
                     dcc.Loading(html.Div(id='img-output'), type="circle", style={'height': '100%', 'width': '100%'}),
                 ]),
+                html.Div(
+                        [
+                            dbc.Label("Local Threshold:"),
+                            dcc.Slider(
+                                id='block_size_cyto',
+                                min=1,
+                                max=99,
+                                step=2,
+                                # marks={integer_1_99[i]: '{}'.format(integer_1_99[i]) for i in range(len(integer_1_99))},
+                                marks=marks,
+                                value=13,
+                                #tooltip = { 'always_visible': True }
+                                ),
+                        ]
+                    ),
                 html.Div(id='run_content'),
                 #svm_slice_slider,
                 html.Div(id='image_data_holder', children=[]),
                 html.Div(id='image_display_holder'),
                 html.Div(id='tab_display'),
+                html.Div(id='value_display'),
                 dcc.Store(id='json_img_ch',data=None),
                 dcc.Store(id='json_img_ch2',data=None),
                 dcc.Store(id='json_react', data=None), # rectangle for memory reduction
@@ -86,6 +116,50 @@ app.layout = dbc.Container(
                 dcc.Interval(id = 'interval',interval=1000,max_intervals=2,disabled=True)
             ]),
             ])], fluid=True)
+
+
+@app.callback(
+    Output('value_display', 'children'),
+    Input('block_size_cyto', 'value'))
+def print_value(value):
+    value
+    return html.P('the value is {}'.format(value))
+
+
+# @app.callback(
+#     [Output('run_content', 'children'),
+#     ServersideOutput('json_img_ch', 'data'),
+#     ServersideOutput('json_img_ch2', 'data')],
+#     [Input('submit-val', 'n_clicks'),
+#      State('upload-image', 'filename'),
+#      State('upload-image', 'contents'),
+#      Input('act_ch', 'value'),
+#      Input('json_react','data'),
+#      ])
+# def Load_image(n,image,cont,channel_sel,react):
+#     '''
+#     react: reactangle from draw compnante of user
+#     '''
+#     if n == 0:
+#         return dash.no_update,dash.no_update,dash.no_update
+#     content_string = cont[0].split('data:image/tiff;base64,')[1]
+#     decoded = base64.b64decode(content_string)
+#     pixels = tfi.imread(io.BytesIO(decoded))
+#     pixels_float = pixels.astype('float64')
+#     img = pixels_float / 65535.000
+#     if channel_sel == 1:
+#         ch_ = img[0,:,:]
+#         ch2_ = img[1,:,:]
+#     else:
+#         ch_ = img[1,:,:]
+#         ch2_ = img[0,:,:]
+#     if react is not None:
+#         y0, y1, x0, x1 = react
+#         ch_ = ch_[y0:y1, x0:x1]
+#         ch2_ = ch2_[y0:y1, x0:x1]
+#     json_object_img_ch = ch_
+#     json_object_img_ch2 = ch2_
+#     return [html.Button('Run', id='run-val', n_clicks=0)],json_object_img_ch,json_object_img_ch2
 
 @app.callback(
     [Output('run_content', 'children'),
@@ -103,25 +177,27 @@ def Load_image(n,image,cont,channel_sel,react):
     '''
     if n == 0:
         return dash.no_update,dash.no_update,dash.no_update
+    import time
+    t = time.time()
+    test = Image.open(BytesIO(base64.b64decode(cont[0][22:])))
+    e =  time.time()
+    print('time pil {}'.format(e-t))
+
+    t = time.time()
     content_string = cont[0].split('data:image/tiff;base64,')[1]
     decoded = base64.b64decode(content_string)
     pixels = tfi.imread(io.BytesIO(decoded))
-    pixels_float = pixels.astype('float64')
-    img = pixels_float / 65535.000
-    if channel_sel == 1:
-        ch_ = img[0,:,:]
-        ch2_ = img[1,:,:]
-    else:
-        ch_ = img[1,:,:]
-        ch2_ = img[0,:,:]
-    if react is not None:
-        y0, y1, x0, x1 = react
-        ch_ = ch_[y0:y1, x0:x1]
-        ch2_ = ch2_[y0:y1, x0:x1]
+    e = time.time()
+    print('time tif {}'.format(e - t))
+
+    # with rasterio.MemoryFile(BytesIO(base64.b64decode(cont[0][22:]))) as memfile:
+    #     with memfile.open() as src:
+    #         arr = rasterio.reshape_as_image(src.read())
+    ch_ = np.asarray(image_string_to_PILImage(cont[0]))
+    ch2_ = np.asarray(image_string_to_PILImage(cont[0]))
     json_object_img_ch = ch_
     json_object_img_ch2 = ch2_
     return [html.Button('Run', id='run-val', n_clicks=0)],json_object_img_ch,json_object_img_ch2
-
 
 
 @app.callback(

@@ -2,6 +2,16 @@ import time
 import skimage.transform
 import tifffile as tfi
 import numpy as np
+integer = np.linspace(1,99,10)
+for i in integer:
+    print(int(i))
+list(np.around(np.arange(1, 99, 10),1))
+
+integer_1_99 = list(np.around(np.arange(1, 99, 10),1)-1)
+integer_1_99[0] = 1
+integer_1_99.append(99)
+marks = {integer_1_99[i]: '{}'.format(integer_1_99[i]) for i in range(len(integer_1_99))}
+
 from skimage.filters import threshold_local
 from scipy.ndimage.morphology import binary_opening
 import skimage.morphology as sm
@@ -56,7 +66,7 @@ text = re.search('"index":.',set)
 x = re.sub(',.*','', set).split(':')[1]
 x.split(':')[1]
 
-
+Image.open(BytesIO(base64.b64decode(image_string[22:])))
 path = '/Users/kanferg/Desktop/NIH_Youle/Colobration/Elliot/drive-download-20220216T203417Z-001/'
 #tifWT_37C_DMSO.tif
 AIPS_object = ai.Segment_over_seed(Image_name='tifWT_37C_DMSO.tif', path=path, rmv_object_nuc=0.5, block_size=83,
