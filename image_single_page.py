@@ -94,9 +94,9 @@ app.layout = dbc.Container(
                                 max=99,
                                 step=2,
                                 # marks={integer_1_99[i]: '{}'.format(integer_1_99[i]) for i in range(len(integer_1_99))},
-                                marks=marks,
+                                marks={i:'{}'.format(i) for i in [1,99]},
                                 value=13,
-                                #tooltip = { 'always_visible': True }
+                                tooltip = { 'always_visible': True }
                                 ),
                         ]
                     ),

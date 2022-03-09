@@ -1,7 +1,7 @@
 '''
 # update branch
 git add .
-git commit -m "03-09-2022 change marks value"
+git commit -m "03-09-2022 correct markers only 3 errors in debug"
 git branch -m server
 git push origin -u server
 '''
@@ -432,4 +432,4 @@ def Updat_offset_cyto(set_n,bar_zoom_cyto,ch2,au,offset_input,bar_ind,image_inpu
 
 if __name__ == "__main__":
     app.run_server()
-    # app.run_server(debug=True)
+    #app.run_server(debug=True)
