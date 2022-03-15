@@ -68,6 +68,8 @@ nav_bar = dbc.Nav(
                         children = [
                         dbc.DropdownMenuItem("Nucleus count predict", href=dash.page_registry['pages.modules.Nuclues_count_predict']['path']),
                         dbc.DropdownMenuItem("SVM target classification", href=dash.page_registry['pages.modules.SVM_target_classification']['path']),
+                        # dbc.DropdownMenuItem("Map and save single cell", href=dash.page_registry['pages.modules.Single_cell_download']['path']),
+
                         ],
                         label="Modules")
                         ]),

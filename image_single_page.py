@@ -49,6 +49,14 @@ app.layout = dbc.Container(
         html.Hr(),
         dbc.Row([
             dbc.Col([
+                    dcc.Upload(
+                        id='upload-test',
+                        children=html.Div([
+                            'Drag and Drop or ',
+                            html.A('Select Files')
+                        ]),className='filedirpath',multiple=True
+                    ),
+
                  dcc.Upload(
                         id='upload-image',
                         children=html.Div([
@@ -117,49 +125,49 @@ app.layout = dbc.Container(
             ]),
             ])], fluid=True)
 
+#
+# @app.callback(
+#     Output('value_display', 'children'),
+#     Input('block_size_cyto', 'value'))
+# def print_value(value):
+#     value
+#     return html.P('the value is {}'.format(value))
+
 
 @app.callback(
-    Output('value_display', 'children'),
-    Input('block_size_cyto', 'value'))
-def print_value(value):
-    value
-    return html.P('the value is {}'.format(value))
-
-
-# @app.callback(
-#     [Output('run_content', 'children'),
-#     ServersideOutput('json_img_ch', 'data'),
-#     ServersideOutput('json_img_ch2', 'data')],
-#     [Input('submit-val', 'n_clicks'),
-#      State('upload-image', 'filename'),
-#      State('upload-image', 'contents'),
-#      Input('act_ch', 'value'),
-#      Input('json_react','data'),
-#      ])
-# def Load_image(n,image,cont,channel_sel,react):
-#     '''
-#     react: reactangle from draw compnante of user
-#     '''
-#     if n == 0:
-#         return dash.no_update,dash.no_update,dash.no_update
-#     content_string = cont[0].split('data:image/tiff;base64,')[1]
-#     decoded = base64.b64decode(content_string)
-#     pixels = tfi.imread(io.BytesIO(decoded))
-#     pixels_float = pixels.astype('float64')
-#     img = pixels_float / 65535.000
-#     if channel_sel == 1:
-#         ch_ = img[0,:,:]
-#         ch2_ = img[1,:,:]
-#     else:
-#         ch_ = img[1,:,:]
-#         ch2_ = img[0,:,:]
-#     if react is not None:
-#         y0, y1, x0, x1 = react
-#         ch_ = ch_[y0:y1, x0:x1]
-#         ch2_ = ch2_[y0:y1, x0:x1]
-#     json_object_img_ch = ch_
-#     json_object_img_ch2 = ch2_
-#     return [html.Button('Run', id='run-val', n_clicks=0)],json_object_img_ch,json_object_img_ch2
+    [Output('run_content', 'children'),
+    ServersideOutput('json_img_ch', 'data'),
+    ServersideOutput('json_img_ch2', 'data')],
+    [Input('submit-val', 'n_clicks'),
+     State('upload-image', 'filename'),
+     State('upload-image', 'contents'),
+     Input('act_ch', 'value'),
+     Input('json_react','data'),
+     ])
+def Load_image(n,image,cont,channel_sel,react):
+    '''
+    react: reactangle from draw compnante of user
+    '''
+    if n == 0:
+        return dash.no_update,dash.no_update,dash.no_update
+    content_string = cont[0].split('data:image/tiff;base64,')[1]
+    decoded = base64.b64decode(content_string)
+    pixels = tfi.imread(io.BytesIO(decoded))
+    pixels_float = pixels.astype('float64')
+    img = pixels_float / 65535.000
+    if channel_sel == 1:
+        ch_ = img[0,:,:]
+        ch2_ = img[1,:,:]
+    else:
+        ch_ = img[1,:,:]
+        ch2_ = img[0,:,:]
+    if react is not None:
+        y0, y1, x0, x1 = react
+        ch_ = ch_[y0:y1, x0:x1]
+        ch2_ = ch2_[y0:y1, x0:x1]
+    json_object_img_ch = ch_
+    json_object_img_ch2 = ch2_
+    return [html.Button('Run', id='run-val', n_clicks=0)],json_object_img_ch,json_object_img_ch2
 
 @app.callback(
     [Output('run_content', 'children'),
