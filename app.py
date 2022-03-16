@@ -1,5 +1,5 @@
 '''
-# update branch
+# Update branch
 git add .
 git commit -m "03-09-2022 change marks value"
 git branch -m server
@@ -16,6 +16,7 @@ from dash_extensions.enrich import Dash, Output, Input, State, ServersideOutput
 import tifffile as tfi
 import os
 import numpy as np
+from skimage.transform import rescale, resize, downscale_local_mean
 import matplotlib.pyplot as plt
 from PIL import Image, ImageEnhance
 from PIL import Image
@@ -175,8 +176,7 @@ def Load_image(n,pram,cont):
 
 
 @app.callback(
-    [
-    ServersideOutput('json_img_ch', 'data'),
+    [ServersideOutput('json_img_ch', 'data'),
     ServersideOutput('json_img_ch2', 'data')],
     [Input('submit-val', 'n_clicks'),
     State('upload-image', 'filename'),
@@ -191,6 +191,8 @@ def Load_image(n,image,cont,channel_sel,react,ch_slice,ch2_slice,slice):
     '''
     react: reactangle from draw compnante of user
     '''
+    w = None
+    h = None
     if n == 0:
         return dash.no_update,dash.no_update
     if slice is True and ch_slice is not None:
@@ -201,6 +203,13 @@ def Load_image(n,image,cont,channel_sel,react,ch_slice,ch2_slice,slice):
         decoded = base64.b64decode(content_string)
         pixels = tfi.imread(io.BytesIO(decoded))
         pixels_float = pixels.astype('float64')
+        if np.shape(pixels_float)[0] > 600 or np.shape(pixels_float)[1] > 600:
+            if np.shape(pixels_float)[1] > np.shape(pixels_float)[2]:
+                w = int(np.shape(pixels_float)[1] / (np.shape(pixels_float)[1] / 500))
+                h = int(np.shape(pixels_float)[2] / (np.shape(pixels_float)[1] / 500))
+            else:
+                w = int(np.shape(pixels_float)[1] / (np.shape(pixels_float)[2] / 500))
+                h = int(np.shape(pixels_float)[2] / (np.shape(pixels_float)[2] / 500))
         img = pixels_float / 65535.000
         if channel_sel == 1:
             ch_ = img[0,:,:]
@@ -212,6 +221,9 @@ def Load_image(n,image,cont,channel_sel,react,ch_slice,ch2_slice,slice):
             y0, y1, x0, x1 = react
             ch_ = ch_[y0:y1, x0:x1]
             ch2_ = ch2_[y0:y1, x0:x1]
+        if w is not None:
+            ch_ = resize(ch_,(h,w))
+            ch2_ = resize(ch2_,(h,w))
     json_object_img_ch = ch_
     json_object_img_ch2 = ch2_
     return json_object_img_ch,json_object_img_ch2
@@ -243,12 +255,8 @@ def store_slice(slice,slice_size,ch,ch2,ch_child,ch2_child):
         count = 0
         for t_ch,t_ch2 in zip(tiles_ch,tiles_ch2):
             count += 1
-            new_store_ch = dcc.Store(id={'type': 'store_obj_ch',
-                                      'index': count},
-                                  data=tiles_ch)
-            new_store_ch2 = dcc.Store(id={'type': 'store_obj_ch2',
-                                      'index': count},
-                                  data=tiles_ch2)
+            new_store_ch = dcc.Store(id={'type': 'store_obj_ch','index': count},data=tiles_ch)
+            new_store_ch2 = dcc.Store(id={'type': 'store_obj_ch2','index': count},data=tiles_ch2)
             ch_child.append(new_store_ch)
             ch2_child.append(new_store_ch2)
         return ch_child,ch2_child

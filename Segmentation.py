@@ -1,17 +1,18 @@
+
 import time
 import skimage.transform
 import tifffile as tfi
 import numpy as np
-integer = np.linspace(1,99,10)
-for i in integer:
-    print(int(i))
-list(np.around(np.arange(1, 99, 10),1))
-
-integer_1_99 = list(np.around(np.arange(1, 99, 10),1)-1)
-integer_1_99[0] = 1
-integer_1_99.append(99)
-marks = {integer_1_99[i]: '{}'.format(integer_1_99[i]) for i in range(len(integer_1_99))}
-
+# integer = np.linspace(1,99,10)
+# for i in integer:
+#     print(int(i))
+# list(np.around(np.arange(1, 99, 10),1))
+#
+# integer_1_99 = list(np.around(np.arange(1, 99, 10),1)-1)
+# integer_1_99[0] = 1
+# integer_1_99.append(99)
+# marks = {integer_1_99[i]: '{}'.format(integer_1_99[i]) for i in range(len(integer_1_99))}
+from skimage.transform import rescale, resize, downscale_local_mean
 from skimage.filters import threshold_local
 from scipy.ndimage.morphology import binary_opening
 import skimage.morphology as sm
@@ -61,10 +62,25 @@ from utils import AIPS_module as ai
 from utils import display_and_xml as dx
 from utils.Display_composit import image_with_contour, countor_map
 import re
-set = '{"index":1,"type":"Image_number_slice"}.n_clicks'
-text = re.search('"index":.',set)
-x = re.sub(',.*','', set).split(':')[1]
-x.split(':')[1]
+
+path = '/Users/kanferg/Desktop/NIH_Youle/Colobration/Elliot/drive-download-20220216T203417Z-001/'
+os.chdir(path)
+pixels = tfi.imread('tifWT_37C_DMSO.tif')
+pixels_float = pixels.astype('float64')
+if np.shape(pixels_float)[1] > np.shape(pixels_float)[2]:
+    w = int(np.shape(pixels_float)[1]/(np.shape(pixels_float)[1]/500))
+    h = int(np.shape(pixels_float)[2]/(np.shape(pixels_float)[1]/500))
+else:
+    w = int(np.shape(pixels_float)[1] / (np.shape(pixels_float)[2] / 500))
+    h = int(np.shape(pixels_float)[2] / (np.shape(pixels_float)[2] / 500))
+img = pixels_float / 65535.000
+resize(img,(w,h))
+ch_ = img[0,:,:]
+ch2_ = img[1,:,:]
+ch_ = resize(ch_,(w,h))
+
+
+
 
 Image.open(BytesIO(base64.b64decode(image_string[22:])))
 path = '/Users/kanferg/Desktop/NIH_Youle/Colobration/Elliot/drive-download-20220216T203417Z-001/'
