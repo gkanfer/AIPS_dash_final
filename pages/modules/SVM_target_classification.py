@@ -114,9 +114,7 @@ def displayClick(targt_btn, ctrl_btn):
     State('global_ther', 'value'),
     State('rmv_object_cyto', 'value'),
     State('rmv_object_cyto_small', 'value'),
-    State('switch_remove_border','on')],
-    suppress_callback_exceptions = True,
-    memoize=True)
+    State('switch_remove_border','on')])
 def Generate_segmentation_and_table(image,ch,ch2,channel,bs,os,osd,ron,bsc,osc,oscd,gt,roc,rocs,remove_bord):
     '''
     Genrate

@@ -47,9 +47,8 @@ controls = dbc.Card(
                         min=1,
                         max=99,
                         step=1,
-                        marks={i:'{}'.format(i) for i in [1,99]},
-                        tooltip={"placement": "bottom", "always_visible": True},
-                        value=99,
+                        marks={i: integer_1_99[i] for i in range(len(integer_1_99))},
+                        value=99
                         ),
                 ]
             ),
@@ -61,8 +60,7 @@ controls = dbc.Card(
                         min=1,
                         max=99,
                         step=1,
-                        marks={i: '{}'.format(i) for i in [1, 99]},
-                        tooltip={"placement": "bottom", "always_visible": True},
+                        marks={i: integer_1_99[i] for i in range(len(integer_1_99))},
                         value=1,
                         ),
             ]),
@@ -152,8 +150,7 @@ controls_nuc = dbc.Card(
                         min=0.000001,
                         max=0.9,
                         step=0.001,
-                        marks={i: '{}'.format(i) for i in [0.000001, 0.9]},
-                        tooltip={"placement": "bottom", "always_visible": True},
+                        marks={i: i for i in [0.000001,0.9]},
                         value=0.001
                     ),
                 ]
@@ -168,8 +165,7 @@ controls_nuc = dbc.Card(
                         min=1,
                         max=99,
                         step=2,
-                        marks={i: '{}'.format(i) for i in [1, 99]},
-                        tooltip={"placement": "bottom", "always_visible": True},
+                        marks={i: integer_1_99[i] for i in range(len(integer_1_99))},
                         value=59,
                         #tooltip = { 'always_visible': True }
                         ),
@@ -183,8 +179,7 @@ controls_nuc = dbc.Card(
                         min=0.01,
                         max=0.99,
                         step=0.01,
-                        marks={i: '{}'.format(i) for i in [0.01,0.99]},
-                        tooltip={"placement": "bottom", "always_visible": True},
+                        marks={i: i for i in [0.01, 0.99]},
                         value=0.9
                     ),
                 ]
@@ -250,8 +245,7 @@ controls_cyto = dbc.Card(
                         min=0.000001,
                         max=0.9,
                         step=0.001,
-                        marks={i: '{}'.format(i) for i in [0.000001, 0.9]},
-                        tooltip={"placement": "bottom", "always_visible": True},
+                        marks={i: i for i in [0.000001,0.9]},
                         value=0.001,
                         #tooltip = { 'always_visible': True }
                     ),
@@ -263,10 +257,9 @@ controls_cyto = dbc.Card(
                     dcc.Slider(
                         id='block_size_cyto',
                         min=1,
-                        max=99,
+                        max=51,
                         step=2,
-                        marks={i: '{}'.format(i) for i in [1, 99]},
-                        tooltip={"placement": "bottom", "always_visible": True},
+                        marks={i: integer_1_99[i] for i in range(len(integer_1_99))},
                         value=13,
                         #tooltip = { 'always_visible': True }
                         ),
@@ -280,8 +273,7 @@ controls_cyto = dbc.Card(
                         min=0.01,
                         max=0.99,
                         step=0.01,
-                        marks={i: '{}'.format(i) for i in [0.01, 0.99]},
-                        tooltip={"placement": "bottom", "always_visible": True},
+                        marks={i: i for i in [0.01, 0.99]},
                         value=0.3
                     ),
                 ]
@@ -294,8 +286,7 @@ controls_cyto = dbc.Card(
                         min=0.01,
                         max=0.99,
                         step=0.01,
-                        marks={i: '{}'.format(i) for i in [0.01, 0.99]},
-                        tooltip={"placement": "bottom", "always_visible": True},
+                        marks={i: i for i in [0.01, 0.99]},
                         value=0.99
                     ),
                 ]
@@ -308,8 +299,7 @@ controls_cyto = dbc.Card(
                         min=0.01,
                         max=0.99,
                         step=0.01,
-                        marks={i: '{}'.format(i) for i in [0.01, 0.99]},
-                        tooltip={"placement": "bottom", "always_visible": True},
+                        marks={i: i for i in [0.01, 0.99]},
                         value=0.99
                     ),
                 ]

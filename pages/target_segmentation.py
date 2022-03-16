@@ -37,8 +37,8 @@ layout = html.Div([
     Input('offset_cyto', 'value'),
     Input('global_ther', 'value'),
     Input('rmv_object_cyto', 'value'),
-    Input('rmv_object_cyto_small', 'value')]
-    ,suppress_callback_exceptions=True)
+    Input('rmv_object_cyto_small', 'value'),
+     ])
 def Parameters_initiation(ch,ch2, image,cont,channel,int_on_nuc,high,low,bs,os,ron,bsc,int_on_cyto,osc,gt,roc,rocs):
     memory_index =  {1:[0.25,4],2:[0.125,8],3:[0.062516,16],4:[0.031258,32]}
     AIPS_object = ai.Segment_over_seed(Image_name=image[0], path=UPLOAD_DIRECTORY,rmv_object_nuc=ron,
