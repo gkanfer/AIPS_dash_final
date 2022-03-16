@@ -155,7 +155,7 @@ app.layout = dbc.Container(
     [Input('submit-parameters', 'n_clicks'),
      State('upload-csv', 'filename'),
      State('upload-csv', 'contents')])
-def Load_image(n,pram,cont):
+def Load_image_parameters_table(n,pram,cont):
     if n < 1:
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update,\
                dash.no_update,dash.no_update, dash.no_update, dash.no_update,dash.no_update,dash.no_update
@@ -183,11 +183,9 @@ def Load_image(n,pram,cont):
     State('upload-image', 'contents'),
     Input('act_ch', 'value'),
     Input('json_react','data'),
-    Input('ch_slice', 'data'),
-    Input('ch2_slice', 'data'),
-    State('slice_image_on','on'),
+    State('downscale_image_on','on'),
      ],memoize=True)
-def Load_image(n,image,cont,channel_sel,react,ch_slice,ch2_slice,slice):
+def Load_image(n,image,cont,channel_sel,react,downscale):
     '''
     react: reactangle from draw compnante of user
     '''
@@ -195,103 +193,34 @@ def Load_image(n,image,cont,channel_sel,react,ch_slice,ch2_slice,slice):
     h = None
     if n == 0:
         return dash.no_update,dash.no_update
-    if slice is True and ch_slice is not None:
-        ch_ = ch_slice
-        ch2_ = ch2_slice
-    else:
-        content_string = cont[0].split('data:image/tiff;base64,')[1]
-        decoded = base64.b64decode(content_string)
-        pixels = tfi.imread(io.BytesIO(decoded))
-        pixels_float = pixels.astype('float64')
-        if np.shape(pixels_float)[0] > 600 or np.shape(pixels_float)[1] > 600:
-            if np.shape(pixels_float)[1] > np.shape(pixels_float)[2]:
-                w = int(np.shape(pixels_float)[1] / (np.shape(pixels_float)[1] / 500))
-                h = int(np.shape(pixels_float)[2] / (np.shape(pixels_float)[1] / 500))
-            else:
-                w = int(np.shape(pixels_float)[1] / (np.shape(pixels_float)[2] / 500))
-                h = int(np.shape(pixels_float)[2] / (np.shape(pixels_float)[2] / 500))
-        img = pixels_float / 65535.000
-        if channel_sel == 1:
-            ch_ = img[0,:,:]
-            ch2_ = img[1,:,:]
+    content_string = cont[0].split('data:image/tiff;base64,')[1]
+    decoded = base64.b64decode(content_string)
+    pixels = tfi.imread(io.BytesIO(decoded))
+    pixels_float = pixels.astype('float64')
+    if downscale:
+        if np.shape(pixels_float)[1] > np.shape(pixels_float)[2]:
+            w = int(np.shape(pixels_float)[1] / (np.shape(pixels_float)[1] / 500))
+            h = int(np.shape(pixels_float)[2] / (np.shape(pixels_float)[1] / 500))
         else:
-            ch_ = img[1,:,:]
-            ch2_ = img[0,:,:]
-        if react is not None:
-            y0, y1, x0, x1 = react
-            ch_ = ch_[y0:y1, x0:x1]
-            ch2_ = ch2_[y0:y1, x0:x1]
-        if w is not None:
-            ch_ = resize(ch_,(h,w))
-            ch2_ = resize(ch2_,(h,w))
+            w = int(np.shape(pixels_float)[1] / (np.shape(pixels_float)[2] / 500))
+            h = int(np.shape(pixels_float)[2] / (np.shape(pixels_float)[2] / 500))
+    img = pixels_float / 65535.000
+    if channel_sel == 1:
+        ch_ = img[0,:,:]
+        ch2_ = img[1,:,:]
+    else:
+        ch_ = img[1,:,:]
+        ch2_ = img[0,:,:]
+    if react is not None:
+        y0, y1, x0, x1 = react
+        ch_ = ch_[y0:y1, x0:x1]
+        ch2_ = ch2_[y0:y1, x0:x1]
+    if w is not None:
+        ch_ = resize(ch_,(h,w))
+        ch2_ = resize(ch2_,(h,w))
     json_object_img_ch = ch_
     json_object_img_ch2 = ch2_
     return json_object_img_ch,json_object_img_ch2
-################################################
-#     Slice image if it is too large
-################################################
-
-@app.callback([
-    Output('ch_holder', 'children'),
-    Output('ch2_holder','children')],
-   [
-    Input('slice_image_on','on'),
-    State('graduated-bar-slice_image','value'),
-    State('json_img_ch', 'data'),
-    State('json_img_ch2', 'data'),
-    State('ch_holder', 'children'),
-    State('ch2_holder', 'children'),
-   ])
-def store_slice(slice,slice_size,ch,ch2,ch_child,ch2_child):
-    if slice == False:
-        return dash.no_update,dash.no_update
-    else:
-        ch = np.array(ch)
-        ch2 = np.array(ch2)
-        H = np.shape(ch2)[0] // slice_size
-        W = np.shape(ch2)[1] // slice_size
-        tiles_ch = [ch[x:x + H, y:y + W] for x in range(0, ch.shape[0], H) for y in range(0, ch.shape[1], W)]
-        tiles_ch2 = [ch2[x:x + H, y:y + W] for x in range(0, ch2.shape[0], H) for y in range(0, ch2.shape[1], W)]
-        count = 0
-        for t_ch,t_ch2 in zip(tiles_ch,tiles_ch2):
-            count += 1
-            new_store_ch = dcc.Store(id={'type': 'store_obj_ch','index': count},data=tiles_ch)
-            new_store_ch2 = dcc.Store(id={'type': 'store_obj_ch2','index': count},data=tiles_ch2)
-            ch_child.append(new_store_ch)
-            ch2_child.append(new_store_ch2)
-        return ch_child,ch2_child
-#
-# display the tabs for slice selection
-@app.callback(
-    Output('Tab_slice', 'children'),
-    Input({'type': 'store_obj_ch', 'index': ALL}, 'data'))
-def display_tab(data):
-    count = np.linspace(1,len(data),len(data))
-    return [html.Div(children=[
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Button("Slice number: {}".format(int(c)),
-                                   id ={'type':'Image_number_slice',
-                                        'index':int(c)}) for c in count])
-                             ])
-                        ])
-                    ]
-
-# # save slice
-@app.callback([
-    ServersideOutput('ch_slice', 'data'),
-    ServersideOutput('ch2_slice', 'data'),
-    Output('slice_selc','data')],
-    [Input({'type': 'store_obj_ch', 'index': ALL}, 'data'),
-    Input({'type': 'store_obj_ch2', 'index': ALL}, 'data'),
-    Input({'type':'Image_number_slice','index':ALL}, 'n_clicks')])
-def save_img_slice(ch_slice,ch2_slice,slice_click):
-    changed_id = [p['prop_id'] for p in callback_context.triggered][0]
-    active_index = re.sub(',.*', '', changed_id).split(':')[1]
-    ch_ = np.array(ch_slice[int(active_index) - 1])[int(active_index) - 1, :, :]
-    ch2_ = np.array(ch2_slice[int(active_index) - 1])[int(active_index) - 1, :, :]
-    return ch_, ch2_,active_index
-
 
 
 @app.callback(Output('graduated-bar', 'value'),
@@ -325,7 +254,6 @@ def update_bar2(bar_slider_zoom):
      ])
 def Updat_offset(set_n,bar_zoom,ch,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont):
     if au:
-        memory_index = {1: [0.25, 4], 2: [0.125, 8], 3: [0.062516, 16], 4: [0.031258, 32]}
         ch_ = np.array(ch)
         med_nuc = np.median(ch_) / 400
         norm = np.random.normal(med_nuc, 0.001*bar_ind, 100)
@@ -335,7 +263,7 @@ def Updat_offset(set_n,bar_zoom,ch,au,offset_input,bar_ind,image_input,channel_s
                                                block_size=59, offset=norm_,
                                                block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4,
                                                rmv_object_cyto=0.99, rmv_object_cyto_small=0.9, remove_border=True)
-            nuc_s = AIPS_object.Nucleus_segmentation(ch_, inv=False,rescale_image=True,scale_factor=memory_index[1])
+            nuc_s = AIPS_object.Nucleus_segmentation(ch_, inv=False)
             offset_pred = norm_
             len_table = len(nuc_s['tabale_init'])
             if len_table > 3:
@@ -399,7 +327,6 @@ def update_bar3(bar_slider_cyto_zoom):
      ])
 def Updat_offset_cyto(set_n,bar_zoom_cyto,ch2,au,offset_input,bar_ind,image_input,channel_sel,n_parm,pram,cont):
     if au:
-        memory_index = {1: [0.25, 4], 2: [0.125, 8], 3: [0.062516, 16], 4: [0.031258, 32]}
         ch2_ = np.array(ch2)
         med_nuc = np.median(ch2_) / 400
         norm = np.random.normal(med_nuc, 0.001*bar_ind, 100)
@@ -409,7 +336,7 @@ def Updat_offset_cyto(set_n,bar_zoom_cyto,ch2,au,offset_input,bar_ind,image_inpu
                                                block_size=59, offset=norm_,
                                                block_size_cyto=9, offset_cyto=0.0004, global_ther=0.4,
                                                rmv_object_cyto=0.99, rmv_object_cyto_small=0.9, remove_border=True)
-            nuc_s = AIPS_object.Nucleus_segmentation(ch2_, inv=False,rescale_image=True,scale_factor=memory_index[1])
+            nuc_s = AIPS_object.Nucleus_segmentation(ch2_, inv=False)
             offset_pred = norm_
             len_table = len(nuc_s['tabale_init'])
             if len_table > 3:

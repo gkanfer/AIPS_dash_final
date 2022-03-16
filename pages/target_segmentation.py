@@ -40,7 +40,6 @@ layout = html.Div([
     Input('rmv_object_cyto_small', 'value'),
      ])
 def Parameters_initiation(ch,ch2, image,cont,channel,int_on_nuc,high,low,bs,os,ron,bsc,int_on_cyto,osc,gt,roc,rocs):
-    memory_index =  {1:[0.25,4],2:[0.125,8],3:[0.062516,16],4:[0.031258,32]}
     AIPS_object = ai.Segment_over_seed(Image_name=image[0], path=UPLOAD_DIRECTORY,rmv_object_nuc=ron,
                                        block_size=bs,
                                        offset=os,
@@ -50,8 +49,7 @@ def Parameters_initiation(ch,ch2, image,cont,channel,int_on_nuc,high,low,bs,os,r
     ch2_ = np.array(ch2)
     ch_3c = af.gray_scale_3ch(ch_)
     ch2_3c = af.gray_scale_3ch(ch2_)
-    nuc_s = AIPS_object.Nucleus_segmentation(ch_,rescale_image=True,scale_factor=memory_index[1])
-    #seg = AIPS_object.Cytosol_segmentation(ch_, ch2_, nuc_s['sort_mask'], nuc_s['sort_mask_bin'], rescale_image=True)
+    nuc_s = AIPS_object.Nucleus_segmentation(ch_)
     # dict_ = {'img':img,'nuc':nuc_s,'seg':seg}
     # try to work on img
     nmask2 = nuc_s['nmask2']
@@ -60,7 +58,7 @@ def Parameters_initiation(ch,ch2, image,cont,channel,int_on_nuc,high,low,bs,os,r
     sort_mask_bin = nuc_s['sort_mask_bin']
     sort_mask_bin = np.array(sort_mask_bin, dtype=np.int8)
     table = nuc_s['table']
-    seg = AIPS_object.Cytosol_segmentation(ch_, ch2_, sort_mask, sort_mask_bin, rescale_image=True,scale_factor=memory_index[1])
+    seg = AIPS_object.Cytosol_segmentation(ch_, ch2_, sort_mask, sort_mask_bin)
     cell_mask_1 = seg['cell_mask_1']
     combine = seg['combine']
     cseg_mask = seg['cseg_mask']

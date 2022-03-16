@@ -71,10 +71,10 @@ controls = dbc.Card(
             # redusing memory
             dbc.Col([
                 daq.BooleanSwitch(
-                    label='slice image',
-                    id='slice_image_on',
+                    label='Image downscale',
+                    id='downscale_image_on',
                     disabled=False,
-                    on=False,
+                    on=True,
                 ),
                 dcc.Slider(
                     id='graduated-bar-slice_image',

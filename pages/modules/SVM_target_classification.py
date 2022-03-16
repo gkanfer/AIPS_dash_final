@@ -114,8 +114,10 @@ def displayClick(targt_btn, ctrl_btn):
     State('global_ther', 'value'),
     State('rmv_object_cyto', 'value'),
     State('rmv_object_cyto_small', 'value'),
+    Input('high_pass', 'value'),
+    Input('low_pass', 'value'),
     State('switch_remove_border','on')])
-def Generate_segmentation_and_table(image,ch,ch2,channel,bs,os,osd,ron,bsc,osc,oscd,gt,roc,rocs,remove_bord):
+def Generate_segmentation_and_table(image,ch,ch2,channel,bs,os,osd,ron,bsc,osc,oscd,gt,roc,rocs,high,low,remove_bord):
     '''
     Genrate
     3 channel grayscale target PIL RGB
@@ -134,7 +136,6 @@ def Generate_segmentation_and_table(image,ch,ch2,channel,bs,os,osd,ron,bsc,osc,o
         osc=osc
     else:
         osc=oscd
-    memory_index = {1: [0.25, 4], 2: [0.125, 8], 3: [0.062516, 16], 4: [0.031258, 32]}
     AIPS_object = ai.Segment_over_seed(Image_name=str(image[0]), path=UPLOAD_DIRECTORY, rmv_object_nuc=ron,
                                        block_size=bs,
                                        offset=os,
@@ -142,9 +143,9 @@ def Generate_segmentation_and_table(image,ch,ch2,channel,bs,os,osd,ron,bsc,osc,o
                                        rmv_object_cyto_small=rocs, remove_border=remove_bord)
     ch_ = np.array(ch)
     ch2_ = np.array(ch2)
-    # ch2_ = af.show_image_adjust(ch2_, low_prec=low, up_prec=high)
-    nuc_s = AIPS_object.Nucleus_segmentation(ch_,rescale_image=True,scale_factor=memory_index[1])
-    seg = AIPS_object.Cytosol_segmentation(ch_, ch2_, nuc_s['sort_mask'], nuc_s['sort_mask_bin'],rescale_image=True,scale_factor=memory_index[1])
+    ch2_ = af.show_image_adjust(ch2_, low_prec=low, up_prec=high)
+    nuc_s = AIPS_object.Nucleus_segmentation(ch_)
+    seg = AIPS_object.Cytosol_segmentation(ch_, ch2_, nuc_s['sort_mask'], nuc_s['sort_mask_bin'])
     # segmentation traces the nucleus segmented image based on the
     ch2_255 = (ch2_ / ch2_.max()) * 255
     ch2_u8 = np.uint8(ch2_255)

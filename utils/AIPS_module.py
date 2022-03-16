@@ -1,3 +1,8 @@
+'''
+Remove rescale factor
+
+'''
+
 import tifffile as tfi
 import numpy as np
 from skimage.filters import threshold_local
@@ -52,7 +57,7 @@ class AIPS:
             l.append(name)
         return l
 
-    def Nucleus_segmentation(self,ch, inv=False, for_dash=False,rescale_image=False,scale_factor=None):
+    def Nucleus_segmentation(self,ch, inv=False, for_dash=False):
         '''
         ch: Input image (tifffile image object)
         inv: if invert than no need to fill hall and open
@@ -61,16 +66,12 @@ class AIPS:
         offset: Detect local edges 0.001-0.9 odd
         rmv_object_nuc: percentile of cells to remove, 0.01-0.99
         rescale_image: boolean, fro reducing memory large images
-        scale_factor: list 4 fold or 8 fold scale
         :return:
         nmask2: local threshold binary map (eg nucleus)
         nmask4: local threshold binary map post opening (eg nucleus)
         sort_mask: RGB segmented image output first channel for mask (eg nucleus)
         sort_mask_bin: Binary
         '''
-        if rescale_image and scale_factor is not None:
-            ch_i = ch
-            ch = skimage.transform.rescale(ch_i,[scale_factor[0],scale_factor[0]], anti_aliasing=False)
         nmask = threshold_local(ch, self.block_size, "mean", self.offset)
         blank = np.zeros(np.shape(ch))
         nmask2 = ch > nmask
@@ -107,11 +108,6 @@ class AIPS:
             sort_mask = blank.astype(int)
         if len(test_image(sort_mask_bin)) < 2:
             sort_mask_bin = blank.astype(int)
-        if rescale_image:
-            nmask2 = skimage.transform.resize(nmask2, (np.shape(ch_i)[0],np.shape(ch_i)[1]),anti_aliasing=False, preserve_range=True)
-            nmask4 = skimage.transform.resize(nmask4, (np.shape(ch_i)[0],np.shape(ch_i)[1]),anti_aliasing=False, preserve_range=True)
-            sort_mask = skimage.transform.resize(sort_mask, (np.shape(ch_i)[0],np.shape(ch_i)[1]), anti_aliasing=False, preserve_range=True)
-            sort_mask_bin = skimage.transform.resize(sort_mask_bin, (np.shape(ch_i)[0],np.shape(ch_i)[1]), anti_aliasing=False, preserve_range=True)
         dict = {'nmask2':nmask2, 'nmask4':nmask4, 'sort_mask':sort_mask, 'sort_mask_bin':sort_mask_bin, 'tabale_init': table_init, 'table':test}
         return dict
 
@@ -130,7 +126,7 @@ class Segment_over_seed(AIPS):
     def test_subclass(self):
         print(self)
 
-    def Cytosol_segmentation(self, ch, ch2,sort_mask,sort_mask_bin,rescale_image=False,scale_factor=None):
+    def Cytosol_segmentation(self, ch, ch2,sort_mask,sort_mask_bin):
         '''
         ch: Input image (tifffile image object)
         ch2: Input image (tifffile image object)
@@ -142,8 +138,6 @@ class Segment_over_seed(AIPS):
         rmv_object_cyto:  percentile of cells to remove, 0.01-0.99
         rmv_object_cyto_small:  percentile of cells to remove, 0.01-0.99
         remove_border: boolean -  object on border of image to be removed
-        rescale_image: boolean, fro reducing memory large images
-        scale_factor: list 4 fold or 8 fold scale
         :return:
         nmask2: local threshold binary map (eg nucleus)
         nmask4: local threshold binary map post opening (eg nucleus)
@@ -158,16 +152,6 @@ class Segment_over_seed(AIPS):
         info_table: Area table cytosol synchronize
         table_unfiltered: Table before remove large and small objects
         '''
-        if rescale_image and scale_factor is not None:
-            ch2_i=ch2
-            ch2 = skimage.transform.rescale(ch2_i, [scale_factor[0],scale_factor[0]], anti_aliasing=False)
-            sort_mask_bin = skimage.transform.rescale(sort_mask_bin, [scale_factor[0],scale_factor[0]], anti_aliasing=False)
-            sort_mask_bin = np.where(sort_mask_bin > 0, 1, 0)
-            sort_mask_bin = binary_erosion(sort_mask_bin, structure=np.ones((3, 3))).astype(np.float64)
-            sort_mask = skimage.transform.rescale(sort_mask, [scale_factor[0],scale_factor[0]], anti_aliasing=False)
-            sort_mask_ = np.where(sort_mask_bin > 0, sort_mask, 0)
-            sort_mask = np.where(np.mod(sort_mask_, 1) > 0, 0, sort_mask_)
-            sort_mask = np.array(sort_mask, np.uint32)
         ther_cell = threshold_local(ch2, self.block_size_cyto, "gaussian", self.offset_cyto)
         blank = np.zeros(np.shape(ch2))
         cell_mask_1 = ch2 > ther_cell
@@ -197,6 +181,12 @@ class Segment_over_seed(AIPS):
         else:
             cseg_mask = cseg_mask
         ############# remove small object ################
+        info_table = pd.DataFrame(
+            measure.regionprops_table(
+                csegg,
+                intensity_image=ch2,
+                properties=['area', 'label', 'centroid', 'coords'],
+            )).set_index('label')
         test2 = info_table[info_table['area'] < info_table['area'].quantile(q = self.rmv_object_cyto_small)]
         if len(test2) > 0:
             x = np.concatenate(np.array(test2['coords']))
@@ -245,20 +235,12 @@ class Segment_over_seed(AIPS):
         cell_mask_1 = evaluate_image_output(cell_mask_1)
         #combine = evaluate_image_output(combine)
         combine_namsk = evaluate_image_output(combine_namsk)
-        cseg_mask = evaluate_image_output(cseg_mask)
+        #cseg_mask = evaluate_image_output(cseg_mask)
         len_unfiltered = len(table_unfiltered)
         len_test1 = len(table_unfiltered.drop(test1.index))
         len_test2 = len(table_unfiltered.drop(test2.index))
         dict_object_table = {'Start':len_unfiltered,"remove large objects":len_test1,"remove small objects":len_test2}
         table_object_summary = pd.DataFrame(dict_object_table,index=[0])
-        # resize image for improving memory usage
-        if rescale_image:
-            cell_mask_2 = skimage.transform.resize(cell_mask_2, (np.shape(ch2_i)[0],np.shape(ch2_i)[1]),anti_aliasing=False, preserve_range=True)
-            cell_mask_3 = skimage.transform.resize(cell_mask_3, (np.shape(ch2_i)[0],np.shape(ch2_i)[1]),anti_aliasing=False, preserve_range=True)
-            combine_namsk = skimage.transform.resize(combine_namsk, (np.shape(ch2_i)[0],np.shape(ch2_i)[1]),anti_aliasing=False, preserve_range=True)
-            cseg = skimage.transform.resize(cseg, (np.shape(ch2_i)[0],np.shape(ch2_i)[1]),anti_aliasing=False, preserve_range=True)
-            cseg_mask = skimage.transform.resize(cseg_mask,(np.shape(ch2_i)[0],np.shape(ch2_i)[1]),anti_aliasing=False, preserve_range=True)
-            cseg_mask_bin = skimage.transform.resize(cseg_mask_bin, (np.shape(ch2_i)[0],np.shape(ch2_i)[1]),anti_aliasing=False, preserve_range=True)
         # check data frame
         if len(info_table)==0:
             d = {'area': [0], 'centroid-0': [0], 'centroid-1': [0], 'label': [0]}
@@ -267,3 +249,31 @@ class Segment_over_seed(AIPS):
             info_table=info_table
         dict = {'cell_mask_1': cell_mask_2,'combine': cell_mask_3,'sort_mask_sync':combine_namsk,'mask_unfiltered':cseg,'cseg_mask': cseg_mask,'cseg_mask_bin':cseg_mask_bin,'info_table': info_table,'table_unfiltered':table_object_summary}
         return dict
+
+    def stackObjects_ebimage_parametrs_method(self,img,mask ,table, extract_pixel, resize_pixel, img_label):
+        '''
+        function similar to the EBimage stackObjectsta, return a crop size based on center of measured mask
+        :param table: properties=['area', 'label', 'centroid']
+        :param extract_pixel: size of extraction acording to mask (e.g. 50 pixel)
+        :param resize_pixel: resize for preforming tf prediction (e.g. 150 pixel)
+        :param img_label: the mask value for stack
+        :return: center image with out background
+        '''
+        table = table.astype({"centroid-0": 'int', "centroid-1": 'int'})
+        x, y = table.loc[img_label, ["centroid-0", "centroid-1"]]
+        mask_value = mask[x, y]
+        x_start = x - extract_pixel
+        x_end = x + extract_pixel
+        y_start = y - extract_pixel
+        y_end = y + extract_pixel
+        if x_start < 0 or x_end < 0 or y_start < 0 or y_end < 0:
+            stack_img = None
+            mask_value = None
+            return stack_img, mask_value
+        else:
+            mask_bin = np.zeros((np.shape(img)[0], np.shape(img)[1]), np.int32)
+            mask_bin[mask == mask_value] = 1
+            masked_image = img * mask_bin
+            stack_img = masked_image[x_start:x_end, y_start:y_end]
+            stack_img = skimage.transform.resize(stack_img, (resize_pixel, resize_pixel), anti_aliasing=False)
+            return stack_img,mask_value
